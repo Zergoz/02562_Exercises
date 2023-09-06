@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>w1p4</title>
+    <script type="text/javascript" src="w1p4.js"></script>
+    <script id="wgsl" type="x-shader">
+    struct VSOut 
+    {
+        @builtin(position) position: vec4f,
+        @location(0) coords : vec2f,
+    };
+
+    @vertex
+    fn main_vs(@builtin(vertex_index) VertexIndex : u32) -> VSOut
+    {
+        const pos = array<vec2f, 4>(vec2f(-1.0, 1.0), vec2f(-1.0, -1.0), vec2f(1.0, 1.0), vec2f(1.0, -1.0));
+        var vsOut: VSOut;
+        vsOut.position = vec4f(pos[VertexIndex], 0.0, 1.0);
+        vsOut.coords = pos[VertexIndex];
+        return vsOut;
+    }
+
+    struct Ray 
+    {
+        origin: vec3f,
+        direction: vec3f,
+        tmin: f32,
+        tmax: f32
+    };
+
+    fn get_camera_ray(uv: vec2f) -> Ray
+    {
+        const e = vec3f(2.0, 1.5, 2.0);
+        const p = vec3f(0.0, 0.5, 0.0);
+        const u = vec3f(0.0, 1.0, 0.0);
+        const d = 1.0;
+        var v = normalize(p-e);
+        var b1 = normalize(cross(v, u));
+        var b2 = cross(b1, v);
+        var q = b1 * uv.x + b2 * uv.y + v * d;
+        var omega = normalize(q);
+
+        var ray = Ray(e, omega, 0.0, 1.0e32);
+        return ray;
+    }
+
+    struct HitInfo
+    {
+        has_hit: bool,
+        dist: f32,
+        position: vec3f,
+        normal: vec3f,
+        color: vec3f,
+    };
+
+    fn intersect_scene(r: ptr<function, Ray>, hit : ptr<function, HitInfo>) -> bool
+    {
+        // Define scene data as constants.
+
+        // Call an intersection function for each object.
+        
+        // For each intersection found, update (*r).tmax and store additional info about the hit.
+
+        return (*hit).has_hit;
+    }
+
+    fn intersect_plane(r: Ray, hit: ptr<function, HitInfo>, position: vec3f, normal: vec3f) -> bool 
+    {
+         
+    }
+    
+    fn intersect_triangle(r: Ray, hit: ptr<function, HitInfo>, v: array<vec3f, 3>) -> bool
+    {
+    
+    }
+
+    fn intersect_sphere(r: Ray, hit: ptr<function, HitInfo>, center: vec3f, radius: f32) -> bool
+    {
+
+    }
+
+    @fragment
+    fn main_fs(@location(0) coords: vec2f) -> @location(0) vec4f
+    {
+        const bgcolor = vec4f(0.1, 0.3, 0.6, 1.0);
+        const max_depth = 10;
+        let uv = vec2f(coords.x*uniforms.aspect*0.5f, coords.y*0.5f);
+        var r = get_camera_ray(uv);
+        var result = vec3f(0.0);
+        var hit = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0));
+        for(var i = 0; i < max_depth; i++) {
+            if(intersect_scene(&r, &hit)) { result += shade(&r, &hit); }
+            else { result += bgcolor.rgb; break; }
+            if(hit.has_hit) { break; }
+        }
+        return vec4f(pow(result, vec3f(1.0/uniforms.gamma)), bgcolor.a);
+    }
+    </script>
+</head>
+<body>
+    <canvas id="webgpu-canvas" width="512" height="512">
+        Please use a browser that supports HTML5 canvas.
+    </canvas>
+</body>
+</html>

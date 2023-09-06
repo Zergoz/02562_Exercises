@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>w1p3</title>
+    <script type="text/javascript" src="w1p3.js"></script>
+    <script id="wgsl" type="x-shader">
+    struct VSOut {
+        @builtin(position) position: vec4f,
+        @location(0) coords : vec2f,
+    };
+    @vertex
+    fn main_vs(@builtin(vertex_index) VertexIndex : u32) -> VSOut
+    {
+        const pos = array<vec2f, 4>(vec2f(-1.0, 1.0), vec2f(-1.0, -1.0), vec2f(1.0, 1.0), vec2f(1.0, -1.0));
+        var vsOut: VSOut;
+        vsOut.position = vec4f(pos[VertexIndex], 0.0, 1.0);
+        vsOut.coords = pos[VertexIndex];
+        return vsOut;
+    }
+    // Define Ray struct
+    struct Ray {
+        origin: vec3f,
+        direction: vec3f,
+        tmin: f32,
+        tmax: f32
+    };
+
+    fn get_camera_ray(uv: vec2f) -> Ray
+    {
+        // Implement ray generation (WGSL has vector operations like normalize and cross)
+        const e = vec3f(2.0, 1.5, 2.0);
+        const p = vec3f(0.0, 0.5, 0.0);
+        const u = vec3f(0.0, 1.0, 0.0);
+        const d = 1.0;
+        var v = normalize(p-e);
+        var b1 = normalize(cross(v, u));
+        var b2 = cross(b1, v);
+        var q = b1 * uv.x + b2 * uv.y + v * d;
+        var omega = normalize(q);
+
+        var ray = Ray(e, omega, 0.0, 1.0e32);
+        return ray;
+    }
+    @fragment
+    fn main_fs(@location(0) coords: vec2f) -> @location(0) vec4f
+    {
+        let uv = coords*0.5;
+        var r = get_camera_ray(uv);
+        return vec4f(r.direction*0.5 + 0.5, 1.0);
+    }
+    </script>
+</head>
+<body>
+    <canvas id="webgpu-canvas" width="512" height="512">
+        Please use a browser that supports HTML5 canvas.
+    </canvas>
+</body>
+</html>
