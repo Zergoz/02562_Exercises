@@ -63,8 +63,38 @@
     fn intersect_scene(r: ptr<function, Ray>, hit : ptr<function, HitInfo>) -> bool
     {
         // Define scene data as constants.
+        // Plane
+        const planePosition = vec3f(0, 0, 0);
+        const planeNormal = vec3f(0, 1, 0);
+        const planeRGB = vec3f(0.1, 0.7, 0);
+        
+        // Triangle
+        const v0 = vec3f(-0.2, 0.1, 0.9);
+        const v1 = vec3f(0.2, 0.1, 0.9);
+        const v2 = vec3f(-0.2, 0.1, -0.1);
+        const triangleRGB = vec3f(0.4, 0.3, 0.2);
+
+        // Sphere
+        const sphereCenter = vec3f(0.0, 0.5, 0.0);
+        const sphereRadius = 0.3;
+        const sphereRI = 1.5;
+        const sphereShininess = 42;
+        const sphereRGB = vec3f(0, 0, 0);
 
         // Call an intersection function for each object.
+        if (intersect_plane(*r, hit, planePosition, planeNormal)) {
+            (*r).tmax = min((*hit).dist, (*r).tmax);
+            (*hit).has_hit = true;
+            (*hit).color = planeRGB;
+        }
+        if (intersect_triangle(*r, hit, (*hit).position, (*hit).normal)) {
+            (*r).tmax = min((*hit).dist, (*r).tmax);
+            (*hit).has_hit = true;
+        }
+        if (intersect_sphere(*r, hit, (*hit).position, (*hit).normal)) {
+            (*r).tmax = min((*hit).dist, (*r).tmax);
+            (*hit).has_hit = true;
+        }
 
         // For each intersection found, update (*r).tmax and store additional info about the hit.
 
@@ -73,27 +103,31 @@
 
     fn intersect_plane(r: Ray, hit: ptr<function, HitInfo>, position: vec3f, normal: vec3f) -> bool 
     {
-        return false;
+        var t = (dot((position - r.origin), normal)) / dot(r.direction, normal);
+        var lt = length(t);
+        var objectHit = (lt < r.tmax) & (lt > r.tmin);
+        if (objectHit) {
+            (*hit).dist = min((*hit).dist, lt);
+            (*hit).position = r.origin + t * r.direction;
+        }
+        return objectHit;
+        
     }
-    
-    fn intersect_triangle(r: Ray, hit: ptr<function, HitInfo>, v: array<vec3f, 3>) -> bool
+
+    fn intersect_triangle(r: Ray, hit: ptr<function, HitInfo>, position: vec3f, normal: vec3f) -> bool 
     {
         return false;
     }
 
-    fn intersect_sphere(r: Ray, hit: ptr<function, HitInfo>, center: vec3f, radius: f32) -> bool
+    fn intersect_sphere(r: Ray, hit: ptr<function, HitInfo>, position: vec3f, normal: vec3f) -> bool 
     {
         return false;
     }
 
     fn shade(r: ptr<function, Ray>, hit: ptr<function, HitInfo>) -> vec3f
     {
-        switch (*hit).shader
-        {
-        //case 1 { return intersect_plane(r, hit, hit.position, hit.normal); }
-        //case 2 { return intersect_triangle(r, hit, ); }
-        //case 3 { return intersect_sphere(r, hit); }
-        case default { return (*hit).color; }
+        switch (*hit).shader {
+            case default { return (*hit).color; }
         }
     }
 

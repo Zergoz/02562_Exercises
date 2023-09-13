@@ -45,6 +45,10 @@ async function main()
         }],
     });
 
+    const aspect = canvas.width/canvas.height;
+    const gamma = 1.5;
+    var uniforms = new Float32Array([aspect, gamma]);
+    device.queue.writeBuffer(uniformBuffer, 0, uniforms);
 
     // Create a render pass in a command buffer and submit it
     const encoder = device.createCommandEncoder();
