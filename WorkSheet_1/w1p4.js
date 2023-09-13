@@ -33,6 +33,19 @@ async function main()
         },
     });
 
+    const uniformBuffer = device.createBuffer({
+        size: 8, // number of bytes
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    const bindGroup = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [{
+            binding: 0,
+            resource: { buffer: uniformBuffer }
+        }],
+    });
+
+
     // Create a render pass in a command buffer and submit it
     const encoder = device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
@@ -45,6 +58,7 @@ async function main()
 
     // Insert render pass commands here
     pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
     pass.draw(4);
     pass.end();
     device.queue.submit([encoder.finish()]);
