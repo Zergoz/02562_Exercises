@@ -45,25 +45,35 @@ async function main()
         }],
     });
 
-    const aspect = canvas.width/canvas.height;
-    const gamma = 1;
-    var uniforms = new Float32Array([aspect, gamma]);
-    device.queue.writeBuffer(uniformBuffer, 0, uniforms);
-
-    // Create a render pass in a command buffer and submit it
-    const encoder = device.createCommandEncoder();
-    const pass = encoder.beginRenderPass({
-        colorAttachments: [{
-            view: context.getCurrentTexture().createView(),
-            loadOp: "clear",
-            storeOp: "store",
-        }]
+    canvas.addEventListener("wheel", function(ev) {
+        ev.preventDefault();
+        let zoom = ev.deltaY > 0 ? 0.95 : 1.05;
+        uniforms[1] *= zoom; 
+        render();
     });
-
-    // Insert render pass commands here
-    pass.setPipeline(pipeline);
-    pass.setBindGroup(0, bindGroup);
-    pass.draw(4);
-    pass.end();
-    device.queue.submit([encoder.finish()]);
+    
+    const aspect = canvas.width/canvas.height;
+    const camera_constant = 1.0;
+    var uniforms = new Float32Array([aspect, camera_constant]);
+    device.queue.writeBuffer(uniformBuffer, 0, uniforms);
+    
+    function render() {
+        device.queue.writeBuffer(uniformBuffer, 0, uniforms);
+        // Create a render pass in a command buffer and submit it
+        const encoder = device.createCommandEncoder();
+        const pass = encoder.beginRenderPass({
+            colorAttachments: [{
+                view: context.getCurrentTexture().createView(),
+                loadOp: "clear",
+                storeOp: "store",
+            }]
+        });
+        // Insert render pass commands here
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, bindGroup);
+        pass.draw(4);
+        pass.end();
+        device.queue.submit([encoder.finish()]);
+    }
+    render();
 }

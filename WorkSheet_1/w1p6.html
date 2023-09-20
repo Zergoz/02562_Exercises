@@ -1,19 +1,26 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>w1p4</title>
-    <script type="text/javascript" src="w1p4.js"></script>
+    <title>w1p6</title>
+    <script type="text/javascript" src="w1p6.js"></script>
     <script id="wgsl" type="x-shader">
     struct Uniforms {
         aspect: f32,
-        gamma: f32,
+        camera_constant: f32
     };
     @group(0) @binding(0) var<uniform> uniforms : Uniforms;
     
     struct VSOut 
     {
         @builtin(position) position: vec4f,
-        @location(0) coords : vec2f,
+        @location(0) coords : vec2f
+    };
+
+    struct Light
+    {
+        L_i: vec3f,
+        direction: vec3f,
+        dist: f32
     };
 
     @vertex
@@ -39,7 +46,7 @@
         const e = vec3f(2.0, 1.5, 2.0);
         const p = vec3f(0.0, 0.5, 0.0);
         const u = vec3f(0.0, 1.0, 0.0);
-        const d = 1.0;
+        var d = uniforms.camera_constant;
         var v = normalize(p-e);
         var b1 = normalize(cross(v, u));
         var b2 = cross(b1, v);
@@ -59,6 +66,18 @@
         color: vec3f,
         shader: i32
     };
+
+    fn sample_point_light(pos: vec3f) -> Light
+    {
+        const lightPosition = vec3f(0.0, 1.0, 0.0);
+        const lightIntensity = 3.1415926535; // Pi, but not
+
+        var L_i = lightIntensity / dot((lightPosition - pos), (lightPosition - pos))
+        
+
+        var light = Light(L_i, b, c);
+        return light;
+    }
 
     fn intersect_scene(r: ptr<function, Ray>, hit : ptr<function, HitInfo>) -> bool
     {
@@ -193,7 +212,7 @@
             else { result += bgcolor.rgb; break; }
             if(hit.has_hit) { break; }
         }
-        return vec4f(pow(result, vec3f(1.0/uniforms.gamma)), bgcolor.a);
+        return vec4f(pow(result, vec3f(1.0)), bgcolor.a);
     }
     </script>
 </head>
