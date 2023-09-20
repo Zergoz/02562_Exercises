@@ -105,6 +105,7 @@
     {
         var t = (dot((position - r.origin), normal)) / dot(r.direction, normal);
         var lt = length(t);
+        
         var objectHit = (lt < r.tmax) & (lt > r.tmin);
         if (objectHit) {
             (*hit).dist = min((*hit).dist, lt);
@@ -126,9 +127,7 @@
 
     fn shade(r: ptr<function, Ray>, hit: ptr<function, HitInfo>) -> vec3f
     {
-        switch (*hit).shader {
-            case default { return (*hit).color; }
-        }
+        return (*hit).color;
     }
 
     @fragment
