@@ -16,13 +16,6 @@
         @location(0) coords : vec2f
     };
 
-    struct Light
-    {
-        L_i: vec3f,
-        direction: vec3f,
-        dist: f32
-    };
-
     @vertex
     fn main_vs(@builtin(vertex_index) VertexIndex : u32) -> VSOut
     {
@@ -32,6 +25,8 @@
         vsOut.coords = pos[VertexIndex];
         return vsOut;
     }
+    
+    const Pi = 3.1415926535; // Pi, but not
 
     struct Ray 
     {
@@ -40,7 +35,7 @@
         tmin: f32,
         tmax: f32
     };
-
+        
     fn get_camera_ray(uv: vec2f) -> Ray
     {
         const e = vec3f(2.0, 1.5, 2.0);
@@ -52,10 +47,34 @@
         var b2 = cross(b1, v);
         var q = b1 * uv.x + b2 * uv.y + v * d;
         var omega = normalize(q);
-
+        
         var ray = Ray(e, omega, 0.0, 1.0e32);
         return ray;
     }
+    
+    struct Light
+    {
+        L_i: vec3f,
+        direction: vec3f,
+        dist: f32
+    };
+
+    
+    fn sample_point_light(pos: vec3f) -> Light
+    {
+        const lightPosition = vec3f(0.0, 1.0, 0.0);
+        const lightIntensity = vec3f(Pi, Pi, Pi); 
+        
+        var L_i = lightIntensity / dot((lightPosition - pos), (lightPosition - pos));
+
+        var l = normalize(lightPosition - pos);
+
+        var tempDist = 0.0;
+        
+        var light = Light(L_i, l, tempDist);
+        return light;
+    }
+    
 
     struct HitInfo
     {
@@ -66,18 +85,6 @@
         color: vec3f,
         shader: i32
     };
-
-    fn sample_point_light(pos: vec3f) -> Light
-    {
-        const lightPosition = vec3f(0.0, 1.0, 0.0);
-        const lightIntensity = 3.1415926535; // Pi, but not
-
-        var L_i = lightIntensity / dot((lightPosition - pos), (lightPosition - pos))
-        
-
-        var light = Light(L_i, b, c);
-        return light;
-    }
 
     fn intersect_scene(r: ptr<function, Ray>, hit : ptr<function, HitInfo>) -> bool
     {
@@ -98,19 +105,22 @@
         const sphereRadius = 0.3;
         const sphereRI = 1.5;
         const sphereShininess = 42;
-        const sphereRGB = vec3f(0, 0, 0);
+        const sphereRGB = vec3f(0.0, 0.0, 0.0);
 
         // Call an intersection function for each object.
         if (intersect_plane(*r, hit, planePosition, planeNormal)) {
             (*r).tmax = min((*hit).dist, (*r).tmax);
             (*hit).has_hit = true;
+            (*hit).shader = 1;
             if ((*r).tmax == (*hit).dist) {
                 (*hit).color = planeRGB;
             }
         }
         if (intersect_triangle(*r, hit, array<vec3f, 3>(v0, v1, v2))) {
             (*r).tmax = min((*hit).dist, (*r).tmax);
+            (*hit).normal = planeNormal;
             (*hit).has_hit = true;
+            (*hit).shader = 1;
             if ((*r).tmax == (*hit).dist) {
                 (*hit).color = triangleRGB;
             }
@@ -118,12 +128,14 @@
         if (intersect_sphere(*r, hit, sphereCenter, sphereRadius)) {
             (*r).tmax = min((*hit).dist, (*r).tmax);
             (*hit).has_hit = true;
+            (*hit).shader = 1;
             if ((*r).tmax == (*hit).dist) {
                 (*hit).color = sphereRGB;
             }
         }
 
         // For each intersection found, update (*r).tmax and store additional info about the hit.
+
 
         return (*hit).has_hit;
     }
@@ -141,6 +153,7 @@
                 (*hit).dist = t;
             }
             (*hit).position = r.origin + t * r.direction;
+            (*hit).normal = normal;
         }
         return objectHit;
     }
@@ -168,6 +181,7 @@
                 (*hit).dist = t;
             }
             (*hit).position = r.origin + t * r.direction;
+            (*hit).normal = n;
         }
         return objectHit;
         
@@ -188,13 +202,26 @@
                 (*hit).dist = t;
             }
             (*hit).position = r.origin + t * r.direction;
+            (*hit).normal = normalize((*hit).position - center);
         }
         return objectHit;
     }
 
+    fn lambertian(r: ptr<function, Ray>, hit: ptr<function, HitInfo>) -> vec3f
+    {
+        var light = sample_point_light((*hit).position);
+
+        return ((*hit).color/Pi) * light.L_i * (max(0, dot((*hit).normal, light.direction)));
+        
+    }
+
     fn shade(r: ptr<function, Ray>, hit: ptr<function, HitInfo>) -> vec3f
     {
-        return (*hit).color;
+        switch (*hit).shader {
+            case 1 { return lambertian(r, hit); }
+            case default { return (*hit).color; }
+        }
+
     }
 
     @fragment
