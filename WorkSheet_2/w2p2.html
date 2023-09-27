@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>w1p6</title>
-    <script type="text/javascript" src="w1p6.js"></script>
+    <title>w2p2</title>
+    <script type="text/javascript" src="w2p2.js"></script>
     <script id="wgsl" type="x-shader">
     struct Uniforms {
         aspect: f32,
-        camera_constant: f32
+        camera_constant: f32,
+        sphereMat: f32
     };
     @group(0) @binding(0) var<uniform> uniforms : Uniforms;
     
@@ -27,6 +28,8 @@
     }
     
     const Pi = 3.1415926535; // Pi, but not
+    const lightPosition = vec3f(0.0, 1.0, 0.0);
+    const epsilon = 0.0001;
 
     struct Ray 
     {
@@ -61,16 +64,15 @@
 
     fn sample_point_light(pos: vec3f) -> Light
     {
-        const lightPosition = vec3f(0.0, 1.0, 0.0);
         const lightIntensity = vec3f(Pi, Pi, Pi); 
         
         var L_i = lightIntensity / dot((lightPosition - pos), (lightPosition - pos));
 
-        var l = normalize(lightPosition - pos);
+        var l = lightPosition - pos;
 
-        var tempDist = 0.0;
+        var dist = length(l);
         
-        var light = Light(L_i, l, tempDist);
+        var light = Light(L_i, normalize(l), dist);
         return light;
     }
 
@@ -80,8 +82,9 @@
         dist: f32,
         position: vec3f,
         normal: vec3f,
-        color: vec3f,
-        shader: i32
+        ambientColor: vec3f,
+        diffuseColor: vec3f,
+        shader: f32
     };
 
     fn intersect_scene(r: ptr<function, Ray>, hit : ptr<function, HitInfo>) -> bool
@@ -111,7 +114,8 @@
             (*hit).has_hit = true;
             (*hit).shader = 1;
             if ((*r).tmax == (*hit).dist) {
-                (*hit).color = planeRGB;
+                (*hit).diffuseColor = 0.9 * planeRGB;
+                (*hit).ambientColor = 0.1 * planeRGB;
             }
         }
         if (intersect_triangle(*r, hit, array<vec3f, 3>(v0, v1, v2))) {
@@ -120,15 +124,17 @@
             (*hit).has_hit = true;
             (*hit).shader = 1;
             if ((*r).tmax == (*hit).dist) {
-                (*hit).color = triangleRGB;
+                (*hit).diffuseColor = 0.9 * triangleRGB;
+                (*hit).ambientColor = 0.1 * triangleRGB;
             }
         }
         if (intersect_sphere(*r, hit, sphereCenter, sphereRadius)) {
             (*r).tmax = min((*hit).dist, (*r).tmax);
             (*hit).has_hit = true;
-            (*hit).shader = 1;
+            (*hit).shader = uniforms.sphereMat;
             if ((*r).tmax == (*hit).dist) {
-                (*hit).color = sphereRGB;
+                (*hit).diffuseColor = 0.9 * sphereRGB;
+                (*hit).ambientColor = 0.1 * sphereRGB;
             }
         }
 
@@ -192,15 +198,31 @@
         var disc = (dot(d, (e - center)) * dot(d, (e - center))) - dot(d, d) * (dot((e - center), (e - center)) - (radius*radius));
         var objectHit = (disc >= 0);
         if (objectHit) {
-            var t = dot(-d, (e - center)) + sqrt(disc) / dot(d, d);
-            if ((*hit).dist > 0) {
-                (*hit).dist = min((*hit).dist, t);
+            var t1 = dot(-d, (e - center)) - sqrt(disc) / dot(d, d);
+            var t2 = dot(-d, (e - center)) + sqrt(disc) / dot(d, d);
+            if ((t1 < r.tmax) & (t1 > r.tmin)) {
+                if ((*hit).dist > 0) {
+                    (*hit).dist = min((*hit).dist, t1);
+                }
+                else {
+                    (*hit).dist = t1;
+                }
+                (*hit).position = r.origin + (*hit).dist * r.direction;
+                (*hit).normal = normalize((*hit).position - center);
+            }
+            else if ((t2 < r.tmax) & (t2 > r.tmin)) {
+                if ((*hit).dist > 0) {
+                    (*hit).dist = min((*hit).dist, t2);
+                }
+                else {
+                    (*hit).dist = t2;
+                }
+                (*hit).position = r.origin + (*hit).dist * r.direction;
+                (*hit).normal = normalize((*hit).position - center);
             }
             else {
-                (*hit).dist = t;
+                objectHit = false;
             }
-            (*hit).position = r.origin + t * r.direction;
-            (*hit).normal = normalize((*hit).position - center);
         }
         return objectHit;
     }
@@ -209,17 +231,32 @@
     {
         var light = sample_point_light((*hit).position);
 
-        return ((*hit).color/Pi) * light.L_i * (max(0, dot((*hit).normal, light.direction)) * 0.9);
+        var ray = Ray(lightPosition, -light.direction, 0.0, light.dist - epsilon);
+        var temp = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0);
+
+        if (intersect_scene(&ray, &temp)) { return vec3f(0,0,0); }
+        else { return ((*hit).diffuseColor/Pi) * light.L_i * (max(0, dot((*hit).normal, light.direction))); }
         
+    }
+
+    fn mirror(r: ptr<function, Ray>, hit: ptr<function, HitInfo>) -> vec3f 
+    {   
+        (*r).direction = 2*(-dot((*r).direction, (*hit).normal) * (*hit).normal) + (*r).direction;
+        (*r).origin = (*hit).position;
+        (*r).tmin = epsilon;
+
+        (*hit).has_hit = false;
+
+        return vec3f(0,0,0);
     }
 
     fn shade(r: ptr<function, Ray>, hit: ptr<function, HitInfo>) -> vec3f
     {
-        switch (*hit).shader {
-            case 1 { return (lambertian(r, hit) + ((*hit).color * 0.1)); }
-            case default { return (*hit).color; }
+        switch i32((*hit).shader) {
+            case 1 { return (lambertian(r, hit) + (*hit).ambientColor); }
+            case 3 { return mirror(r, hit); }
+            case default { return (*hit).ambientColor + (*hit).diffuseColor; }
         }
-
     }
 
     @fragment
@@ -230,7 +267,7 @@
         let uv = vec2f(coords.x*uniforms.aspect*0.5f, coords.y*0.5f);
         var r = get_camera_ray(uv);
         var result = vec3f(0.0);
-        var hit = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), 0);
+        var hit = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0);
         for(var i = 0; i < max_depth; i++) 
         {
             if(intersect_scene(&r, &hit)) { result += shade(&r, &hit); }
@@ -245,5 +282,9 @@
     <canvas id="webgpu-canvas" width="512" height="512">
         Please use a browser that supports HTML5 canvas.
     </canvas>
+    <select id="sphereMenu", size="2">
+        <option value="3" selected>Mirror</option>
+        <option value="1">Matte</option>
+    </select>
 </body>
 </html>
