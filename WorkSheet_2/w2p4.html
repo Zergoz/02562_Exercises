@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>w2p2</title>
-    <script type="text/javascript" src="w2p2.js"></script>
+    <title>w2p4</title>
+    <script type="text/javascript" src="w2p4.js"></script>
     <script id="wgsl" type="x-shader">
     struct Uniforms {
         aspect: f32,
@@ -85,7 +85,10 @@
         normal: vec3f,
         ambientColor: vec3f,
         diffuseColor: vec3f,
-        shader: f32
+        shader: f32,
+        ior1_over_ior2: f32,
+        rho_s: f32,
+        s: f32
     };
 
     fn intersect_scene(r: ptr<function, Ray>, hit : ptr<function, HitInfo>) -> bool
@@ -105,9 +108,10 @@
         // Sphere
         const sphereCenter = vec3f(0.0, 0.5, 0.0);
         const sphereRadius = 0.3;
+        const sphereRGB = vec3f(0.0, 0.0, 0.0);
         const sphereRI = 1.5;
         const sphereShininess = 42;
-        const sphereRGB = vec3f(0.0, 0.0, 0.0);
+        const specularReflectance = 0.1;
 
         // Call an intersection function for each object.
         if (intersect_plane(*r, hit, planePosition, planeNormal)) {
@@ -133,6 +137,9 @@
             (*r).tmax = min((*hit).dist, (*r).tmax);
             (*hit).has_hit = true;
             (*hit).shader = uniforms.sphereMat;
+            (*hit).ior1_over_ior2 = sphereRI;
+            (*hit).rho_s = specularReflectance;
+            (*hit).s = sphereShininess;
             if ((*r).tmax == (*hit).dist) {
                 (*hit).diffuseColor = 0.9 * sphereRGB;
                 (*hit).ambientColor = 0.1 * sphereRGB;
@@ -201,7 +208,7 @@
         if (objectHit) {
             var t1 = dot(-d, (e - center)) - sqrt(disc) / dot(d, d);
             var t2 = dot(-d, (e - center)) + sqrt(disc) / dot(d, d);
-            if ((t1 < r.tmax) & (t1 > r.tmin)) {
+            if ((t1 < r.tmax) && (t1 > r.tmin)) {
                 if ((*hit).dist > 0) {
                     (*hit).dist = min((*hit).dist, t1);
                 }
@@ -211,7 +218,7 @@
                 (*hit).position = r.origin + (*hit).dist * r.direction;
                 (*hit).normal = normalize((*hit).position - center);
             }
-            else if ((t2 < r.tmax) & (t2 > r.tmin)) {
+            else if ((t2 < r.tmax) && (t2 > r.tmin)) {
                 if ((*hit).dist > 0) {
                     (*hit).dist = min((*hit).dist, t2);
                 }
@@ -233,29 +240,66 @@
         var light = sample_point_light((*hit).position);
 
         var ray = Ray(lightPosition, -light.direction, 0.0, light.dist - epsilon);
-        var temp = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0);
+        var temp = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0);
 
         if (intersect_scene(&ray, &temp)) { return vec3f(0,0,0); }
         else { return ((*hit).diffuseColor/Pi) * light.L_i * (max(0, dot((*hit).normal, light.direction))); }
         
     }
 
+    fn phong(r: ptr<function, Ray>, hit: ptr<function, HitInfo>) -> vec3f
+    {
+        var light = sample_point_light((*hit).position);
+        var Lr = ((*hit).diffuseColor/Pi + (*hit).rho_s * ((*hit).s + 2)/(2*Pi) * pow(max(0, dot(-(*r).direction, reflect(-light.direction, (*hit).normal))), (*hit).s)) * light.L_i * max(0, dot(light.direction, (*hit).normal));
+        
+        return Lr;
+    }
+
     fn mirror(r: ptr<function, Ray>, hit: ptr<function, HitInfo>) -> vec3f 
     {   
-        (*r).direction = 2*(-dot((*r).direction, (*hit).normal) * (*hit).normal) + (*r).direction;
+        (*r).direction = reflect((*r).direction, (*hit).normal);
         (*r).origin = (*hit).position;
         (*r).tmin = epsilon;
+        (*r).tmax = 1e32;
 
         (*hit).has_hit = false;
-
+        
         return vec3f(0,0,0);
+    }
+    
+    fn refraction(r: ptr<function, Ray>, hit: ptr<function, HitInfo>) -> vec3f
+        {
+        if (dot((*r).direction, (*hit).normal) < 0) {
+            (*hit).ior1_over_ior2 = 1/(*hit).ior1_over_ior2;
+        }
+        else {
+            (*hit).ior1_over_ior2 = (*hit).ior1_over_ior2/1;
+            (*hit).normal = -(*hit).normal;
+        }
+
+        var cosSqTheta_t = 1 - pow((*hit).ior1_over_ior2, 2) * (1 - pow(dot((*r).direction, (*hit).normal),2));
+        
+        if (cosSqTheta_t < 0) {
+            return mirror(r, hit);
+        }
+        else {
+            (*r).direction = (*hit).ior1_over_ior2 * (dot(-(*r).direction, (*hit).normal) * (*hit).normal + (*r).direction) - (*hit).normal * sqrt(cosSqTheta_t);
+            (*hit).has_hit = false;
+            (*r).origin = (*hit).position;
+            (*r).tmin = epsilon;
+            (*r).tmax = 1e32;
+            return vec3f(0,0,0);
+        }
+
     }
 
     fn shade(r: ptr<function, Ray>, hit: ptr<function, HitInfo>) -> vec3f
     {
         switch i32((*hit).shader) {
             case 1 { return (lambertian(r, hit) + (*hit).ambientColor); }
+            case 2 { return phong(r, hit); }
             case 3 { return mirror(r, hit); }
+            case 4 { return refraction(r, hit); }
             case default { return (*hit).ambientColor + (*hit).diffuseColor; }
         }
     }
@@ -268,7 +312,7 @@
         let uv = vec2f(coords.x*uniforms.aspect*0.5f, coords.y*0.5f);
         var r = get_camera_ray(uv);
         var result = vec3f(0.0);
-        var hit = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0);
+        var hit = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0);
         for(var i = 0; i < max_depth; i++) 
         {
             if(intersect_scene(&r, &hit)) { result += shade(&r, &hit); }
@@ -283,10 +327,12 @@
     <canvas id="webgpu-canvas" width="512" height="512">
         Please use a browser that supports HTML5 canvas.
     </canvas>
-    <select id="sphereMenu", size="3">
+    <select id="sphereMenu", size="5">
         <option value="0">Base Color</option>
         <option value="1">Lambertian</option>
+        <option value="2">Phong</option>
         <option value="3" selected>Mirror</option>
+        <option value="4">Refractive</option>
     </select>
     <select id="otherMenu", size="2">
         <option value="0">Base Color</option>
