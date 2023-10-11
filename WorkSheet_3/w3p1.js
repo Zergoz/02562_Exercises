@@ -32,20 +32,31 @@ async function main()
             topology: "triangle-strip",
         },
     });
-
-    const uniformBuffer = device.createBuffer({
-        size: 16, // number of bytes
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
     
     const texture = await load_texture(device, "grass.jpg");
-    const bindGroup = device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: uniformBuffer } },
-            { binding: 1, resource: texture.sampler },
-            { binding: 2, resource: texture.createView() }
-        ],
+    
+    var groupNumber = 0;
+    var bindGroups = [];
+    for (var i = 0; i < 4; ++i) {
+        const bindGroup = device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: [
+                { binding: 0, resource: texture.samplers[i] },
+                { binding: 1, resource: texture.createView() }
+            ],
+        });
+        bindGroups.push(bindGroup)
+    }
+    var addressMenu = document.getElementById("addressMenu");
+    addressMenu.addEventListener("change", function(ev) {
+        groupNumber = parseInt(addressMenu.value) + parseInt(filterMenu.value);
+        requestAnimationFrame(animate);
+    });
+    
+    var filterMenu = document.getElementById("filterMenu");
+    filterMenu.addEventListener("change", function(ev) {
+        groupNumber = parseInt(addressMenu.value) + parseInt(filterMenu.value);
+        requestAnimationFrame(animate);
     });
     
     async function load_texture(device, filename)
@@ -72,49 +83,44 @@ async function main()
         const texture = device.createTexture({
             size: [img.width, img.height, 1],
             format: "rgba8unorm",
-            usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING
+            usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT
         });
         device.queue.writeTexture({ texture: texture }, textureData,
         { offset: 0, bytesPerRow: img.width*4, rowsPerImage: img.height, }, [img.width, img.height, 1]);
         
         // Create sampler
-        texture.sampler = device.createSampler({
+        texture.samplers = [];
+        
+        texture.samplers.push(device.createSampler({
+            addressModeU: "clamp-to-edge",
+            addressModeV: "clamp-to-edge",
+            minFilter: "nearest",
+            magFilter: "nearest",
+        }));
+        texture.samplers.push(device.createSampler({
+            addressModeU: "clamp-to-edge",
+            addressModeV: "clamp-to-edge",
+            minFilter: "linear",
+            magFilter: "linear",
+        }));
+        texture.samplers.push(device.createSampler({
             addressModeU: "repeat",
             addressModeV: "repeat",
             minFilter: "nearest",
             magFilter: "nearest",
-        });
+        }));
+        texture.samplers.push(device.createSampler({
+            addressModeU: "repeat",
+            addressModeV: "repeat",
+            minFilter: "linear",
+            magFilter: "linear",
+        }));
+
         return texture;
     }
-    /*
-    var addressMenu = document.getElementById("addressMenu");
-    addressMenu.addEventListener("change", function(ev) {
-        uniforms[2] = addressMenu.value;
-        render()
-    });
-    */
-    var filterMenu = document.getElementById("filterMenu");
-    filterMenu.addEventListener("change", function(ev) {
-        uniforms[3] = filterMenu.value;
-        render()
-    });
 
-    canvas.addEventListener("wheel", function(ev) {
-        ev.preventDefault();
-        let zoom = ev.deltaY > 0 ? 0.95 : 1.05;
-        uniforms[1] *= zoom; 
-        render();
-    });
-    
-    const aspect = canvas.width/canvas.height;
-    const camera_constant = 1.0;
-    const sphereMat = 3;
-    const otherMat = 1;
-    var uniforms = new Float32Array([aspect, camera_constant, sphereMat, otherMat]);
-    device.queue.writeBuffer(uniformBuffer, 0, uniforms);
-    
+
     function render() {
-        device.queue.writeBuffer(uniformBuffer, 0, uniforms);
         // Create a render pass in a command buffer and submit it
         const encoder = device.createCommandEncoder();
         const pass = encoder.beginRenderPass({
@@ -124,14 +130,15 @@ async function main()
                 storeOp: "store",
             }]
         });
+
         // Insert render pass commands here
         pass.setPipeline(pipeline);
-        pass.setBindGroup(0, bindGroup);
+        pass.setBindGroup(0, bindGroups[groupNumber]);
         pass.draw(4);
         pass.end();
         device.queue.submit([encoder.finish()]);
     }
     
-    function animate() { render(device, context, pipeline, bindGroup); }
+    function animate() { render(device, context, pipeline, bindGroups[groupNumber]); }
     animate();
 }
