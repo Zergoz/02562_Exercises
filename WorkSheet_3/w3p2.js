@@ -86,16 +86,16 @@ async function main()
         });
         return texture;
     }
-    /*
-    var addressMenu = document.getElementById("addressMenu");
-    addressMenu.addEventListener("change", function(ev) {
-        uniforms[2] = addressMenu.value;
+
+    var sphereMenu = document.getElementById("sphereMenu");
+    sphereMenu.addEventListener("change", function(ev) {
+        uniforms[2] = sphereMenu.value;
         render()
     });
-    */
-    var filterMenu = document.getElementById("filterMenu");
-    filterMenu.addEventListener("change", function(ev) {
-        uniforms[3] = filterMenu.value;
+    
+    var otherMenu = document.getElementById("otherMenu");
+    otherMenu.addEventListener("change", function(ev) {
+        uniforms[3] = otherMenu.value;
         render()
     });
 
