@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>w2p5</title>
-    <script type="text/javascript" src="w2p5.js"></script>
+    <title>w3p1</title>
+    <script type="text/javascript" src="w3p1.js"></script>
     <script id="wgsl" type="x-shader">
     struct Uniforms {
         aspect: f32,
@@ -11,6 +11,8 @@
         otherMat: f32
     };
     @group(0) @binding(0) var<uniform> uniforms : Uniforms;
+    @group(0) @binding(1) var my_sampler: sampler;
+    @group(0) @binding(2) var my_texture: texture_2d<f32>;
     
     struct VSOut
     {
@@ -88,7 +90,15 @@
         shader: f32,
         ior1_over_ior2: f32,
         rho_s: f32,
-        s: f32
+        s: f32,
+        texcoords: vec3f,
+        use_texture: bool
+    };
+
+    struct Onb {
+        tangent: vec3f,
+        binormal: vec3f,
+        normal: vec3f,
     };
 
     fn intersect_scene(r: ptr<function, Ray>, hit : ptr<function, HitInfo>) -> bool
@@ -98,6 +108,7 @@
         const planePosition = vec3f(0, 0, 0);
         const planeNormal = vec3f(0, 1, 0);
         const planeRGB = vec3f(0.1, 0.7, 0);
+        const plane_onb = Onb(vec3f(-1.0, 0.0, 0.0), vec3f(0.0, 0.0, 1.0), planeNormal);
         
         // Triangle
         const v0 = vec3f(-0.2, 0.1, 0.9);
@@ -114,7 +125,7 @@
         const specularReflectance = 0.1;
 
         // Call an intersection function for each object.
-        if (intersect_plane(*r, hit, planePosition, planeNormal)) {
+        if (intersect_plane(*r, hit, planePosition, plane_onb)) {
             (*r).tmax = min((*hit).dist, (*r).tmax);
             (*hit).has_hit = true;
             (*hit).shader = uniforms.otherMat;
@@ -152,9 +163,9 @@
         return (*hit).has_hit;
     }
 
-    fn intersect_plane(r: Ray, hit: ptr<function, HitInfo>, position: vec3f, normal: vec3f) -> bool 
+    fn intersect_plane(r: Ray, hit: ptr<function, HitInfo>, position: vec3f, plane_onb: Onb) -> bool 
     {
-        var t = (dot(position - r.origin, normal)) / dot(r.direction, normal);
+        var t = (dot(position - r.origin, plane_onb.normal)) / dot(r.direction, plane_onb.normal);
         
         var objectHit = (t < r.tmax) & (t > r.tmin);
         if (objectHit) {
@@ -165,7 +176,10 @@
                 (*hit).dist = t;
             }
             (*hit).position = r.origin + t * r.direction;
-            (*hit).normal = normal;
+            (*hit).normal = plane_onb.normal;
+
+            (*hit).texcoords = 0.2 * vec3f(dot((*hit).position - position, plane_onb.tangent), dot((*hit).position - position, plane_onb.binormal), 0);
+            (*hit).use_texture = true;
         }
         return objectHit;
     }
@@ -240,7 +254,7 @@
         var light = sample_point_light((*hit).position);
 
         var ray = Ray(lightPosition, -light.direction, 0.0, light.dist - epsilon);
-        var temp = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0);
+        var temp = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0, vec3f(0.0), false);
 
         if (intersect_scene(&ray, &temp)) { return vec3f(0,0,0); }
         else { return ((*hit).diffuseColor/Pi) * light.L_i * (max(0, dot((*hit).normal, light.direction))); }
@@ -309,6 +323,8 @@
         }
     }
 
+
+
     @fragment
     fn main_fs(@location(0) coords: vec2f) -> @location(0) vec4f
     {
@@ -317,11 +333,19 @@
         let uv = vec2f(coords.x*uniforms.aspect*0.5f, coords.y*0.5f);
         var r = get_camera_ray(uv);
         var result = vec3f(0.0);
-        var hit = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0);
+        var textured = vec3f(0.0);
+        var hit = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0, vec3f(0.0), false);
         for(var i = 0; i < max_depth; i++) 
         {
-            if(intersect_scene(&r, &hit)) { result += shade(&r, &hit); }
+            if(intersect_scene(&r, &hit)) { 
+                if (hit.use_texture) { textured += shade(&r, &hit); }
+                else { result += shade(&r, &hit); }
+            }
             else { result += bgcolor.rgb; break; }
+            
+            result += textured * textureSample(my_texture, my_sampler, hit.texcoords);
+
+
             if(hit.has_hit) { break; }
         }
         return vec4f(pow(result, vec3f(1.0)), bgcolor.a);
