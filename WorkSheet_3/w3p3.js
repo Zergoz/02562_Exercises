@@ -45,6 +45,7 @@ async function main()
         size: jitter.byteLength,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     });
+    device.queue.writeBuffer(jitterBuffer, 0, jitter);
     
     const texture = await load_texture(device, "grass.jpg");
     const bindGroup = device.createBindGroup({
@@ -134,7 +135,7 @@ async function main()
     const camera_constant = 1.0;
     const sphereMat = 3;
     const otherMat = 1;
-    const jitterSub = 2;
+    const jitterSub = 4;
     var uniforms = new Float32Array([aspect, camera_constant, sphereMat, otherMat, jitterSub]);
     device.queue.writeBuffer(uniformBuffer, 0, uniforms);
     
