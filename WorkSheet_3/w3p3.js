@@ -36,7 +36,7 @@ async function main()
     });
 
     const uniformBuffer = device.createBuffer({
-        size: 32, // number of bytes
+        size: 20, // number of bytes
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -119,14 +119,14 @@ async function main()
     var incrementSubdivs = document.getElementById("Increment Subdivs")
     incrementSubdivs.addEventListener("click", function(ev) {
         let temp = Math.sqrt(uniforms[4]);
-        if (temp < 10) { uniforms[4] += (temp+1)*(temp+1); }
+        if (temp < 10) { uniforms[4] = (temp+1)*(temp+1); }
         animate();
     });
 
     var decrementSubdivs = document.getElementById("Decrement Subdivs")
     decrementSubdivs.addEventListener("click", function(ev) {
         let temp = Math.sqrt(uniforms[4]);
-        if (temp > 1) { uniforms[4] -= (temp-1)*(temp-1); }
+        if (temp > 1) { uniforms[4] = (temp-1)*(temp-1); }
         animate();
     });
     
@@ -168,17 +168,23 @@ async function main()
 
 function compute_jitters(jitter, pixelSize, jitterSub)
 {
-  const step = pixelSize/jitterSub;
-  if(jitterSub < 2) {
-    jitter[0] = 0.0;
-    jitter[1] = 0.0;
-  }
-  else {
-    for(var i = 0; i < jitterSub; ++i)
-      for(var j = 0; j < jitterSub; ++j) {
-        const idx = (i*jitterSub + j)*2;
-        jitter[idx] = (Math.random() + j)*step - pixelSize*0.5;
-        jitter[idx + 1] = (Math.random() + i)*step - pixelSize*0.5;
-      }
-  }
+	const subDiv = Math.sqrt(jitterSub);
+	const step = pixelSize/subDiv;
+	if(subDiv < 2) 
+	{
+		jitter[0] = 0.0;
+		jitter[1] = 0.0;
+	}
+	else 
+	{
+		for (var i = 0; i < subDiv; ++i) 
+		{
+			for (var j = 0; j < subDiv; ++j) 
+			{
+			const idx = (i*subDiv + j)*2;
+			jitter[idx] = (Math.random() + j)*step - pixelSize*0.5;
+			jitter[idx + 1] = (Math.random() + i)*step - pixelSize*0.5;
+			}
+		}
+	}
 }

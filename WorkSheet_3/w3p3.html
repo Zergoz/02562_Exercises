@@ -9,7 +9,7 @@
         camera_constant: f32,
         sphereMat: f32,
         otherMat: f32,
-        jitterSub: u32
+        jitterSub: i32
     };
     @group(0) @binding(0) var<uniform> uniforms : Uniforms;
     @group(0) @binding(1) var my_sampler: sampler;
@@ -327,19 +327,52 @@
             case default { return (*hit).ambientColor + (*hit).diffuseColor; }
         }
     }
-
-
-
+    
     @fragment
     fn main_fs(@location(0) coords: vec2f) -> @location(0) vec4f
     {
         const bgcolor = vec4f(0.1, 0.3, 0.6, 1.0);
         const max_depth = 10;
-        var summedResult = vec3f(0.0);
-        for (var j = u32(0); j < uniforms.jitterSub; j++) {
+        let uv = vec2f(coords.x*uniforms.aspect*0.5f, coords.y*0.5f);
+        var r = get_camera_ray(uv);
+        let temp = jitter[0];
+        let temp2 = uniforms.jitterSub;
+        var result = vec3f(0.0);
+        var textured = vec3f(0.0);
+        var hit = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0, vec2f(0.0), false);
+
+        for(var i = 0; i < max_depth; i++) 
+        {
+            if(intersect_scene(&r, &hit)) { 
+                if (hit.use_texture) { textured += shade(&r, &hit); }
+                else { result += shade(&r, &hit); }
+            }
+            else { 
+                if (hit.use_texture) { textured += bgcolor.rgb; }
+                else { result += bgcolor.rgb; }
+                break; 
+            }
+
+            if(hit.has_hit) { break; }
+        }
+        
+        let texColor = textureSample(my_texture, my_sampler, hit.texcoords).rgb;
+        result += textured*texColor;
+
+        return vec4f(pow(result, vec3f(0.66)), bgcolor.a);
+    }
+    
+    /*
+    @fragment
+    fn main_fs(@location(0) coords: vec2f) -> @location(0) vec4f
+    {
+        const bgcolor = vec4f(0.1, 0.3, 0.6, 1.0);
+        const max_depth = 10;
+        var result = vec3f(0.0);
+        for (var j = 0; j < uniforms.jitterSub; j++) 
+        {
             let uv = vec2f(coords.x*uniforms.aspect*0.5f, coords.y*0.5f);
             var r = get_camera_ray(uv+jitter[j]);
-            var result = vec3f(0.0);
             var textured = vec3f(0.0);
             var hit = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0, vec2f(0.0), false);
     
@@ -360,11 +393,11 @@
             
             let texColor = textureSample(my_texture, my_sampler, hit.texcoords).rgb;
             result += textured*texColor;
-            summedResult += result;
         }
-        summedResult = summedResult / f32(uniforms.jitterSub);
-        return vec4f(pow(summedResult, vec3f(0.66)), bgcolor.a);
+        result /= f32(uniforms.jitterSub);
+        return vec4f(pow(result, vec3f(0.66)), bgcolor.a);
     }
+    */
     </script>
 </head>
 <body>
