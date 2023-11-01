@@ -46,7 +46,7 @@ async function main()
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     });
     device.queue.writeBuffer(jitterBuffer, 0, jitter);
-    
+
     const texture = await load_texture(device, "grass.jpg");
     const bindGroup = device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),
@@ -140,7 +140,7 @@ async function main()
     device.queue.writeBuffer(uniformBuffer, 0, uniforms);
     
     function render() {
-        compute_jitters(jitter, pixelSize, uniforms[4]);
+        compute_jitters(jitter, pixelSize, Math.sqrt(uniforms[4]));
         device.queue.writeBuffer(jitterBuffer, 0, jitter);
 
         device.queue.writeBuffer(uniformBuffer, 0, uniforms);
