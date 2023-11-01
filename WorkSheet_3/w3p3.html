@@ -9,7 +9,8 @@
         camera_constant: f32,
         sphereMat: f32,
         otherMat: f32,
-        jitterSub: f32
+        jitterSub: f32,
+        scalingFactor: f32
     };
     @group(0) @binding(0) var<uniform> uniforms : Uniforms;
     @group(0) @binding(1) var my_sampler: sampler;
@@ -184,7 +185,7 @@
             (*hit).position = r.origin + t * r.direction;
             (*hit).normal = plane_onb.normal;
 
-            (*hit).texcoords = 0.2 * vec2f(dot((*hit).position - position, plane_onb.tangent), dot((*hit).position - position, plane_onb.binormal));
+            (*hit).texcoords = uniforms.scalingFactor * vec2f(dot((*hit).position - position, plane_onb.tangent), dot((*hit).position - position, plane_onb.binormal));
         }
         return objectHit;
     }
@@ -418,5 +419,14 @@
     </select>
     <button id="Increment Subdivs">Increment</button>
     <button id="Decrement Subdivs">Decrement</button>
+    <select id="filterMenu", size="2">
+        <option value="0" selected>Nearest</option>
+        <option value="1">Linear</option>
+    </select>
+    <div>
+        scalingFactor 0.02 <input id="ScaleMeDaddy" type="range"
+        min="0.02" max="0.2" step="0.02" value="0.2" />
+        0.2
+    </div>
 </body>
 </html>

@@ -48,15 +48,20 @@ async function main()
     device.queue.writeBuffer(jitterBuffer, 0, jitter);
 
     const texture = await load_texture(device, "grass.jpg");
-    const bindGroup = device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: uniformBuffer } },
-            { binding: 1, resource: texture.sampler },
-            { binding: 2, resource: texture.createView() },
-            { binding: 3, resource: { buffer: jitterBuffer } },
-        ],
-    });
+    var groupNumber = 0;
+    var bindGroups = [];
+    for (var i = 0; i < 2; ++i) {
+        const bindGroup = device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: [
+                { binding: 0, resource: { buffer: uniformBuffer } },
+                { binding: 1, resource: texture.samplers[i] },
+                { binding: 2, resource: texture.createView() },
+                { binding: 3, resource: { buffer: jitterBuffer } },
+            ],
+        });
+        bindGroups.push(bindGroup);
+    }
     
     async function load_texture(device, filename)
     {   
@@ -88,12 +93,20 @@ async function main()
         { offset: 0, bytesPerRow: img.width*4, rowsPerImage: img.height, }, [img.width, img.height, 1]);
         
         // Create sampler
-        texture.sampler = device.createSampler({
+        texture.samplers = [];
+        
+        texture.samplers.push(device.createSampler({
             addressModeU: "repeat",
             addressModeV: "repeat",
             minFilter: "nearest",
             magFilter: "nearest",
-        });
+        }));
+        texture.samplers.push(device.createSampler({
+            addressModeU: "repeat",
+            addressModeV: "repeat",
+            minFilter: "linear",
+            magFilter: "linear",
+        }));
         return texture;
     }
     
@@ -130,13 +143,25 @@ async function main()
         animate();
     });
     
+    var filterMenu = document.getElementById("filterMenu");
+    filterMenu.addEventListener("change", function(ev) {
+        groupNumber = parseInt(filterMenu.value);
+        requestAnimationFrame(animate);
+    });
+
+    var scalorgatorSlide = document.getElementById("ScaleMeDaddy");
+    scalorgatorSlide.addEventListener("input", function(ev) {
+        uniforms[5] = ev.currentTarget.value;
+        animate();
+    });
 
     const aspect = canvas.width/canvas.height;
     const camera_constant = 1.0;
     const sphereMat = 3;
     const otherMat = 1;
     const jitterSub = 4;
-    var uniforms = new Float32Array([aspect, camera_constant, sphereMat, otherMat, jitterSub, 0, 0, 0]);
+    const scalingFactor = 0.2;
+    var uniforms = new Float32Array([aspect, camera_constant, sphereMat, otherMat, jitterSub, scalingFactor, 0, 0]);
     device.queue.writeBuffer(uniformBuffer, 0, uniforms);
     
     function render() {
@@ -156,32 +181,31 @@ async function main()
 
         // Insert render pass commands here
         pass.setPipeline(pipeline);
-        pass.setBindGroup(0, bindGroup);
+        pass.setBindGroup(0, bindGroups[groupNumber]);
         pass.draw(4);
         pass.end();
         device.queue.submit([encoder.finish()]);
     }
     
-    function animate() { render(device, context, pipeline, bindGroup); }
+    function animate() { render(device, context, pipeline, bindGroups[groupNumber]); }
     animate();
 }
 
 function compute_jitters(jitter, pixelSize, jitterSub)
 {
-	const subDiv = jitterSub;
-	const step = pixelSize/subDiv;
-	if(subDiv < 2) 
+	const step = pixelSize/jitterSub;
+	if(jitterSub < 2) 
 	{
 		jitter[0] = 0.0;
 		jitter[1] = 0.0;
 	}
 	else 
 	{
-		for (var i = 0; i < subDiv; ++i) 
+		for (var i = 0; i < jitterSub; ++i) 
 		{
-			for (var j = 0; j < subDiv; ++j) 
+			for (var j = 0; j < jitterSub; ++j) 
 			{
-			const idx = (i*subDiv + j)*2;
+			const idx = (i*jitterSub + j)*2;
 			jitter[idx] = (Math.random() + j)*step - pixelSize*0.5;
 			jitter[idx + 1] = (Math.random() + i)*step - pixelSize*0.5;
 			}
