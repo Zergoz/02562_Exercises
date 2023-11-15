@@ -49,29 +49,32 @@ async function main()
         g_objDoc = objDoc;
     }
 
+    let jitter = new Float32Array(200); // allowing subdivs from 1 to 10
+        const jitterBuffer = device.createBuffer({
+            size: jitter.byteLength,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+        });
+        
+    device.queue.writeBuffer(jitterBuffer, 0, jitter);
+    
+    // Set up buffers
+    const uniformBuffer = device.createBuffer({
+        size: 16, // number of bytes
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const aspect = canvas.width/canvas.height;
+    const camera_constant = 2.5;
+    const jitterSub = 1;
+    var uniforms = new Float32Array([aspect, camera_constant, jitterSub, 0  ]);
+    device.queue.writeBuffer(uniformBuffer, 0, uniforms);
+
     // OBJ File has been read completely
     function onReadComplete(device, pipeline)
     {
         // Get access to loaded data
         g_drawingInfo = g_objDoc.getDrawingInfo();
-
-        // Set up buffers
-        const uniformBuffer = device.createBuffer({
-            size: 16, // number of bytes
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-        const aspect = canvas.width/canvas.height;
-        const camera_constant = 2.5;
-        const jitterSub = 4;
-        var uniforms = new Float32Array([aspect, camera_constant, jitterSub, 0]);
-        device.queue.writeBuffer(uniformBuffer, 0, uniforms);
-    
-        let jitter = new Float32Array(200); // allowing subdivs from 1 to 10
-        const jitterBuffer = device.createBuffer({
-            size: jitter.byteLength,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-        });
-        device.queue.writeBuffer(jitterBuffer, 0, jitter);
+        
 
         const vBuffer = device.createBuffer({
             size: g_drawingInfo.vertices.byteLength,
@@ -127,28 +130,6 @@ async function main()
     });
 
     
-    function render() {
-        compute_jitters(jitter, pixelSize, uniforms[4]);
-        device.queue.writeBuffer(jitterBuffer, 0, jitter);
-
-        device.queue.writeBuffer(uniformBuffer, 0, uniforms);
-        // Create a render pass in a command buffer and submit it
-        const encoder = device.createCommandEncoder();
-        const pass = encoder.beginRenderPass({
-            colorAttachments: [{
-                view: context.getCurrentTexture().createView(),
-                loadOp: "clear",
-                storeOp: "store",
-            }]
-        });
-
-        // Insert render pass commands here
-        pass.setPipeline(pipeline);
-        pass.setBindGroup(0, bindGroup);
-        pass.draw(4);
-        pass.end();
-        device.queue.submit([encoder.finish()]);
-    }
     
     var bindGroup;
     function animate() 
@@ -163,7 +144,30 @@ async function main()
             requestAnimationFrame(animate);
             return;
         }
-        render(device, context, pipeline, bindGroup);
+        render();
+    }
+    
+    function render() {
+        compute_jitters(jitter, pixelSize, uniforms[4]);
+        device.queue.writeBuffer(jitterBuffer, 0, jitter);
+    
+        device.queue.writeBuffer(uniformBuffer, 0, uniforms);
+        // Create a render pass in a command buffer and submit it
+        const encoder = device.createCommandEncoder();
+        const pass = encoder.beginRenderPass({
+            colorAttachments: [{
+                view: context.getCurrentTexture().createView(),
+                loadOp: "clear",
+                storeOp: "store",
+            }]
+        });
+    
+        // Insert render pass commands here
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, bindGroup);
+        pass.draw(4);
+        pass.end();
+        device.queue.submit([encoder.finish()]);
     }
     animate();
 }

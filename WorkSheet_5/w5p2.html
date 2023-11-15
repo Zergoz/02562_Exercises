@@ -80,6 +80,21 @@
         return light;
     }
 
+    fn sample_directional_light() -> Light 
+    {
+        const intensityGAINS = 1;
+        const lightIntensity = vec3f(Pi*intensityGAINS, Pi*intensityGAINS, Pi*intensityGAINS);
+
+        var L_i = lightIntensity;
+
+        var l = normalize(vec3f(-1.0, -1.0, -1.0));
+
+        var dist = 1e32;
+
+        var light = Light(L_i, l, dist);
+        return light;
+    }
+
     struct HitInfo
     {
         has_hit: bool,
@@ -96,16 +111,15 @@
 
     fn intersect_scene(r: ptr<function, Ray>, hit : ptr<function, HitInfo>) -> bool
     {
-        var triangleRGB = vec3f(1,0,1);
-        for (var i = 0; i < arrayLength(&face); ++i) 
+        var triangleRGB = vec3f(0.9);
+        (*r).tmin = epsilon;
+        for (var i = 0u; i < arrayLength(&face); i++) 
         {
             if (intersect_triangle(*r, hit, i)) {
                 (*r).tmax = min((*hit).dist, (*r).tmax);
                 (*hit).has_hit = true;
                 if ((*r).tmax == (*hit).dist) {
-                    (*hit).diffuseColor = 0.9 * triangleRGB;
-                    (*hit).ambientColor = 0.1 * triangleRGB;
-                    (*hit).use_texture = false;
+                    (*hit).diffuseColor = triangleRGB;
                 }
             }
         }
@@ -136,7 +150,7 @@
                 (*hit).dist = t;
             }
             (*hit).position = r.origin + t * r.direction;
-            (*hit).normal = n;
+            (*hit).normal = normalize(n);
         }
         return objectHit;
         
@@ -144,13 +158,13 @@
 
     fn shade(r: ptr<function, Ray>, hit: ptr<function, HitInfo>) -> vec3f
     {   
-        var light = sample_point_light((*hit).position);
+        var light = sample_directional_light();
 
-        var ray = Ray(lightPosition, -light.direction, 0.0, light.dist - epsilon);
-        var temp = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0, vec2f(0.0), false);
+        var ray = Ray((*hit).position, -light.direction, 0.0, light.dist);
+        var temp = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0);
 
         if (intersect_scene(&ray, &temp)) { return vec3f(0,0,0); }
-        else { return ((*hit).diffuseColor/Pi) * light.L_i * (max(0, dot((*hit).normal, light.direction))); }
+        else { return ((*hit).diffuseColor/Pi) * 1 * light.L_i * dot(-light.direction, (*hit).normal); }
     }
     
     @fragment
