@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>w5p2</title>
-    <script type="text/javascript" src="w5p2.js"></script>
+    <title>w5p4</title>
+    <script type="text/javascript" src="w5p4.js"></script>
     <script type="text/javascript" src="../common/OBJParser.js"></script>
     <script id="wgsl" type="x-shader">
     struct Uniforms {
@@ -13,7 +13,10 @@
     @group(0) @binding(0) var<uniform> uniforms : Uniforms;
     @group(0) @binding(1) var<storage> jitter: array<vec2f>; 
     @group(0) @binding(2) var<storage> triangle: array<vec3f>; 
-    @group(0) @binding(3) var<storage> face: array<vec3u>; 
+    @group(0) @binding(3) var<storage> face: array<vec3u>;
+    @group(0) @binding(5) var<storage> mat_index: array<u32>;
+    @group(0) @binding(6) var<storage> mColor: array<vec4f>;
+    @group(0) @binding(7) var<storage> mEmission: array<vec4f>;
     
     struct VSOut
     {
@@ -45,8 +48,8 @@
         
     fn get_camera_ray(uv: vec2f) -> Ray
     {
-        const e = vec3f(0.15, 1.5, 10.0);
-        const p = vec3f(0.15, 1.5, 0.0);
+        const e = vec3f(277.0, 275.0, -570.0);
+        const p = vec3f(277.0, 275.0, 0.0);
         const u = vec3f(0.0, 1.0, 0.0);
         var d = uniforms.camera_constant;
         var v = normalize(p-e);
@@ -119,7 +122,7 @@
                 (*r).tmax = min((*hit).dist, (*r).tmax);
                 (*hit).has_hit = true;
                 if ((*r).tmax == (*hit).dist) {
-                    (*hit).diffuseColor = triangleRGB;
+                    (*hit).diffuseColor = mColor[mat_index[i]].rgb + mEmission[mat_index[i]].rgb;
                 }
             }
         }
@@ -132,7 +135,6 @@
         var e0 = triangle[temp.y] - triangle[temp.x];
         var e1 = triangle[temp.z] - triangle[temp.x];
         var n = cross(e0, e1);
-        
         var t = (dot((triangle[temp.x] - r.origin), n)) / dot(r.direction, n);
         
         var objectHit = false;
@@ -140,17 +142,17 @@
             var beta = dot(cross((triangle[temp.x]-r.origin), r.direction), e1)/dot(r.direction, n);
             var gamma = -dot(cross((triangle[temp.x]-r.origin), r.direction), e0)/dot(r.direction, n);
             objectHit = (beta >= 0) & (gamma >= 0) & ((beta + gamma) <= 1);
-        }
-        
-        if (objectHit) {
-            if ((*hit).dist > 0) {
-                (*hit).dist = min((*hit).dist, t);
+            
+            if (objectHit) {
+                if ((*hit).dist > 0) {
+                    (*hit).dist = min((*hit).dist, t);
+                }
+                else {
+                    (*hit).dist = t;
+                }
+                (*hit).position = r.origin + t * r.direction;
+                (*hit).normal = normalize(n);
             }
-            else {
-                (*hit).dist = t;
-            }
-            (*hit).position = r.origin + t * r.direction;
-            (*hit).normal = normalize(n);
         }
         return objectHit;
         
@@ -163,7 +165,8 @@
         var ray = Ray((*hit).position, -light.direction, 0.0, light.dist);
         var temp = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0);
 
-        return ((*hit).diffuseColor/Pi) * 1 * light.L_i * dot(-light.direction, (*hit).normal);
+        //return ((*hit).diffuseColor/Pi) * 1 * light.L_i * dot(-light.direction, (*hit).normal);
+        return (*hit).diffuseColor;
     }
     
     @fragment
@@ -198,7 +201,7 @@
     </script>
 </head>
 <body>
-    <canvas id="webgpu-canvas" width="800" height="450">
+    <canvas id="webgpu-canvas" width="512" height="512">
         Please use a browser that supports HTML5 canvas.
     </canvas>
 </body>

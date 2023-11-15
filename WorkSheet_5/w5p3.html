@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>w5p2</title>
-    <script type="text/javascript" src="w5p2.js"></script>
+    <title>w5p3</title>
+    <script type="text/javascript" src="w5p3.js"></script>
     <script type="text/javascript" src="../common/OBJParser.js"></script>
     <script id="wgsl" type="x-shader">
     struct Uniforms {
@@ -13,7 +13,8 @@
     @group(0) @binding(0) var<uniform> uniforms : Uniforms;
     @group(0) @binding(1) var<storage> jitter: array<vec2f>; 
     @group(0) @binding(2) var<storage> triangle: array<vec3f>; 
-    @group(0) @binding(3) var<storage> face: array<vec3u>; 
+    @group(0) @binding(3) var<storage> face: array<vec3u>;
+    @group(0) @binding(4) var<storage> vNormal: array<vec3f>;
     
     struct VSOut
     {
@@ -132,25 +133,27 @@
         var e0 = triangle[temp.y] - triangle[temp.x];
         var e1 = triangle[temp.z] - triangle[temp.x];
         var n = cross(e0, e1);
-        
+        var x = vec3f(0);
         var t = (dot((triangle[temp.x] - r.origin), n)) / dot(r.direction, n);
         
         var objectHit = false;
         if ((t < r.tmax) & (t > r.tmin)) {
             var beta = dot(cross((triangle[temp.x]-r.origin), r.direction), e1)/dot(r.direction, n);
             var gamma = -dot(cross((triangle[temp.x]-r.origin), r.direction), e0)/dot(r.direction, n);
+            var alpha = 1 - beta - gamma;
             objectHit = (beta >= 0) & (gamma >= 0) & ((beta + gamma) <= 1);
-        }
-        
-        if (objectHit) {
-            if ((*hit).dist > 0) {
-                (*hit).dist = min((*hit).dist, t);
+            
+            if (objectHit) {
+                if ((*hit).dist > 0) {
+                    (*hit).dist = min((*hit).dist, t);
+                }
+                else {
+                    (*hit).dist = t;
+                }
+                (*hit).position = r.origin + t * r.direction;
+                var x = alpha * vNormal[temp.x] + beta * vNormal[temp.y] + gamma * vNormal[temp.z];
+                (*hit).normal = normalize(x);
             }
-            else {
-                (*hit).dist = t;
-            }
-            (*hit).position = r.origin + t * r.direction;
-            (*hit).normal = normalize(n);
         }
         return objectHit;
         
