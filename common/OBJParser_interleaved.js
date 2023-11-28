@@ -294,17 +294,13 @@ OBJDoc.prototype.getDrawingInfo = function () {
   // Create an arrays for vertex coordinates, normals, colors, and indices
   var numVertices = 0;
   var numIndices = 0;
-  var numFaces = 0;
   for (var i = 0; i < this.objects.length; i++) {
     numIndices += this.objects[i].numIndices + this.objects[i].numIndices/3;
-    numFaces += this.objects[i].numIndices/3;
   }
   var numVertices = this.vertices.length;
-  var vertices = new Float32Array(numVertices*4);
-  var normals = new Float32Array(numVertices*4);
+  var attribs = new Float32Array(numVertices*8);
   var colors = new Float32Array(numVertices*4);
   var indices = new Uint32Array(numIndices);
-  var mat_indices = new Uint32Array(numFaces);
   var materials = [];
   var mat_map = new Map();
   var light_indices = [];
@@ -329,7 +325,7 @@ OBJDoc.prototype.getDrawingInfo = function () {
       }
       if(mat.emission !== undefined && mat.emission.r + mat.emission.g + mat.emission.b > 0.0)
         light_indices.push(face_indices);
-      mat_indices[face_indices++] = mat_idx;
+      ++face_indices;
       var color = mat.color === undefined ? new Color(0.8, 0.8, 0.8, 1.0) : mat.color;
       var faceNormal = face.normal;
       for (var k = 0; k < face.vIndices.length; ++k) {
@@ -338,10 +334,10 @@ OBJDoc.prototype.getDrawingInfo = function () {
         indices[index_indices] = vIdx;
         // Copy vertex
         var vertex = this.vertices[vIdx];
-        vertices[vIdx*4 + 0] = vertex.x;
-        vertices[vIdx*4 + 1] = vertex.y;
-        vertices[vIdx*4 + 2] = vertex.z;
-        vertices[vIdx*4 + 3] = 1.0;
+        attribs[vIdx*8 + 0] = vertex.x;
+        attribs[vIdx*8 + 1] = vertex.y;
+        attribs[vIdx*8 + 2] = vertex.z;
+        attribs[vIdx*8 + 3] = 1.0;
         // Copy color
         colors[vIdx*4 + 0] = color.r;
         colors[vIdx*4 + 1] = color.g;
@@ -351,15 +347,15 @@ OBJDoc.prototype.getDrawingInfo = function () {
         var nIdx = face.nIndices[k];
         if (nIdx >= 0) {
           var normal = this.normals[nIdx];
-          normals[vIdx*4 + 0] = normal.x;
-          normals[vIdx*4 + 1] = normal.y;
-          normals[vIdx*4 + 2] = normal.z;
-          normals[vIdx*4 + 3] = 0.0;
+          attribs[vIdx*8 + 4] = normal.x;
+          attribs[vIdx*8 + 5] = normal.y;
+          attribs[vIdx*8 + 6] = normal.z;
+          attribs[vIdx*8 + 7] = 0.0;
         } else {
-          normals[vIdx*4 + 0] = faceNormal.x;
-          normals[vIdx*4 + 1] = faceNormal.y;
-          normals[vIdx*4 + 2] = faceNormal.z;
-          normals[vIdx*4 + 3] = 0.0;
+          attribs[vIdx*8 + 4] = faceNormal.x;
+          attribs[vIdx*8 + 5] = faceNormal.y;
+          attribs[vIdx*8 + 6] = faceNormal.z;
+          attribs[vIdx*8 + 7] = 0.0;
         }
         index_indices++;
       }
@@ -367,7 +363,7 @@ OBJDoc.prototype.getDrawingInfo = function () {
     }
   }
 
-  return new DrawingInfo(vertices, normals, colors, indices, materials, mat_indices, new Uint32Array(light_indices));
+  return new DrawingInfo(attribs, colors, indices, materials, new Uint32Array(light_indices));
 }
 
 //------------------------------------------------------------------------------
@@ -452,13 +448,11 @@ var Face = function (materialName) {
 //------------------------------------------------------------------------------
 // DrawInfo Object
 //------------------------------------------------------------------------------
-var DrawingInfo = function (vertices, normals, colors, indices, materials, mat_indices, light_indices) {
-  this.vertices = vertices;
-  this.normals = normals;
+var DrawingInfo = function (attribs, colors, indices, materials, light_indices) {
+  this.attribs = attribs;
   this.colors = colors;
   this.indices = indices;
   this.materials = materials;
-  this.mat_indices = mat_indices;
   this.light_indices = light_indices;
 }
 
