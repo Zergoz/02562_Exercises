@@ -3,21 +3,34 @@
 <head>
     <title>w6p2</title>
     <script type="text/javascript" src="w6p2.js"></script>
-    <script type="text/javascript" src="../common/OBJParser.js"></script>
+    <script type="text/javascript" src="../common/OBJParser_interleaved.js"></script>
+    <script type="text/javascript" src="../common/BspTree_interleaved.js"></script>
+    <script type="text/javascript" src="../common/MV.js"></script>
+    <script type="text/javascript" src="../common/Aabb.js"></script>
     <script id="wgsl" type="x-shader">
     struct Uniforms {
         aspect: f32,
         camera_constant: f32,
         jitterSub: f32,
     };
+    struct Aabb {
+        min: vec3f,
+        max: vec3f,
+    };
+    struct vAttribute {
+        triangle: vec3f,
+        normal: vec3f,
+    }
     @group(0) @binding(0) var<uniform> uniforms : Uniforms;
     @group(0) @binding(1) var<storage> jitter: array<vec2f>; 
-    @group(0) @binding(2) var<storage> triangle: array<vec3f>; 
-    @group(0) @binding(3) var<storage> face: array<vec3u>;
-    @group(0) @binding(5) var<storage> mat_index: array<u32>;
-    @group(0) @binding(6) var<storage> mColor: array<vec4f>;
-    @group(0) @binding(7) var<storage> mEmission: array<vec4f>;
-    @group(0) @binding(8) var<storage> light_index: array<u32>;
+    @group(0) @binding(2) var<storage> attribs: array<vAttribute>; 
+    @group(0) @binding(3) var<storage> faceMat: array<vec4u>;
+    @group(0) @binding(4) var<uniform> aabb: Aabb;
+    @group(0) @binding(5) var<storage> treeIds: array<u32>;
+    @group(0) @binding(6) var<storage> bspTree: array<vec4u>;
+    @group(0) @binding(7) var<storage> bspPlanes: array<f32>;
+    @group(0) @binding(8) var<storage> mEmission: array<vec4f>;
+    @group(0) @binding(9) var<storage> light_index: array<u32>;
     
     struct VSOut
     {
@@ -36,7 +49,12 @@
     }
     
     const Pi = 3.1415926535; // Pi, but not
+    const lightPosition = vec3f(0.0, 1.0, 0.0);
     const epsilon = 0.0001;
+    const MAX_LEVEL = 20u;
+    const BSP_LEAF = 3u;
+    var<private> branch_node: array<vec2u, MAX_LEVEL>;
+    var<private> branch_ray: array<vec2f, MAX_LEVEL>;
 
     struct Ray 
     {
@@ -45,6 +63,92 @@
         tmin: f32,
         tmax: f32
     };
+
+    fn intersect_min_max(r: ptr<function, Ray>) -> bool
+    {
+        let p1 = (aabb.min - (*r).origin)/(*r).direction;
+        let p2 = (aabb.max - (*r).origin)/(*r).direction;
+        let pmin = min(p1, p2);
+        let pmax = max(p1, p2);
+        let tmin = max(pmin.x, max(pmin.y, pmin.z));
+        let tmax = min(pmax.x, min(pmax.y, pmax.z));
+        if (tmin > tmax || tmin > (*r).tmax || tmax < (*r).tmin) 
+        {
+            return false;
+        }
+        (*r).tmin = max(tmin - 1.0e-4f, (*r).tmin);
+        (*r).tmax = min(tmax + 1.0e-4f, (*r).tmax);
+        return true;
+    }
+
+    fn intersect_trimesh(r: ptr<function, Ray>, hit: ptr<function, HitInfo>) -> bool
+    {
+        var branch_lvl = 0u;
+        var near_node = 0u;
+        var far_node = 0u;
+        var t = 0.0f;
+        var node = 0u;
+        for(var i = 0u; i <= MAX_LEVEL; i++) 
+        {
+            let tree_node = bspTree[node];
+            let node_axis_leaf = tree_node.x&3u;
+            if (node_axis_leaf == BSP_LEAF) 
+            {
+                // A leaf was found
+                let node_count = tree_node.x>>2u;
+                let node_id = tree_node.y;
+                var found = false;
+                for(var j = 0u; j < node_count; j++) 
+                {
+                    let obj_idx = treeIds[node_id + j];
+                    if(intersect_triangle(*r, hit, obj_idx)) 
+                    {
+                        (*r).tmax = (*hit).dist;
+                        found = true;
+                    }
+                }
+                if(found) { return true; }
+                else if(branch_lvl == 0u) { return false; }
+                else 
+                {
+                    branch_lvl--;
+                    i = branch_node[branch_lvl].x;
+                    node = branch_node[branch_lvl].y;
+                    (*r).tmin = branch_ray[branch_lvl].x;
+                    (*r).tmax = branch_ray[branch_lvl].y;
+                    continue;
+                }
+            }
+            let axis_direction = (*r).direction[node_axis_leaf];
+            let axis_origin = (*r).origin[node_axis_leaf];
+            if(axis_direction >= 0.0f) 
+            {
+                near_node = tree_node.z; // left
+                far_node = tree_node.w; // right
+            }
+            else 
+            {
+                near_node = tree_node.w; // right
+                far_node = tree_node.z; // left
+            }
+            let node_plane = bspPlanes[node];
+            let denom = select(axis_direction, 1.0e-8f, abs(axis_direction) < 1.0e-8f);
+            t = (node_plane - axis_origin)/denom;
+            if(t > (*r).tmax) { node = near_node; }
+            else if(t < (*r).tmin) { node = far_node; }
+            else 
+            {
+                branch_node[branch_lvl].x = i;
+                branch_node[branch_lvl].y = far_node;
+                branch_ray[branch_lvl].x = t;
+                branch_ray[branch_lvl].y = (*r).tmax;
+                branch_lvl++;
+                (*r).tmax = t;
+                node = near_node;
+            }
+        }
+        return false;
+    }
         
     fn get_camera_ray(uv: vec2f) -> Ray
     {
@@ -58,7 +162,7 @@
         var q = b1 * uv.x + b2 * uv.y + v * d;
         var omega = normalize(q);
         
-        var ray = Ray(e, omega, epsilon, 1.0e32 - epsilon);
+        var ray = Ray(e, omega, 0.0, 1.0e32);
         return ray;
     }
     
@@ -71,16 +175,17 @@
 
     fn sample_point_light(pos: vec3f) -> Light
     {
-        const lightIntensity = vec3f(Pi, Pi, Pi); 
+        var lightIntensity = vec3f(0.0); 
         
         var lightPosition = vec3f(0.0);
 
         for (var i = 0; i < 2; i++) 
         {
-            let temp = face[light_index[i]];
-            lightPosition += triangle[temp.x] + triangle[temp.y] + triangle[temp.z];
+            let temp = faceMat[light_index[i]];
+            lightPosition += attribs[temp.x].triangle + attribs[temp.y].triangle + attribs[temp.z].triangle;
+            lightIntensity += mEmission[faceMat[light_index[i]].w].rgb;
         }
-        lightPosition /= 6;
+        lightPosition /= 6.0;
 
         var l = (pos - lightPosition);
         
@@ -92,13 +197,13 @@
         
         for (var i = 0; i < 2; i++) 
         {
-            let temp = face[light_index[i]]; 
-            var e0 = (triangle[temp.y] - triangle[temp.x]);
-            var e1 = (triangle[temp.z] - triangle[temp.x]);
+            let temp = faceMat[light_index[i]];
+            var e0 = (attribs[temp.y].triangle - attribs[temp.x].triangle);
+            var e1 = (attribs[temp.z].triangle - attribs[temp.x].triangle);
             n = cross(e0, e1);
             area += length(n)/2;
         }
-        L_i = dot(l, normalize(n)) * lightIntensity * area;
+        L_i = dot(normalize(l), normalize(n)) * lightIntensity * area;
         
         var light = Light(L_i, normalize(l), dist);
         return light;
@@ -127,6 +232,7 @@
         normal: vec3f,
         ambientColor: vec3f,
         diffuseColor: vec3f,
+        emission: vec3f,
         shader: f32,
         ior1_over_ior2: f32,
         rho_s: f32,
@@ -135,13 +241,17 @@
 
     fn intersect_scene(r: ptr<function, Ray>, hit : ptr<function, HitInfo>) -> bool
     {
-        for (var i = 0u; i < arrayLength(&face); i++) 
+        var triangleRGB = vec3f(0.9);
+        (*r).tmin = epsilon;
+        if (intersect_min_max(r)) 
         {
-            if (intersect_triangle(*r, hit, i)) {
+            if (intersect_trimesh(r, hit)) 
+            {
                 (*r).tmax = min((*hit).dist, (*r).tmax);
                 (*hit).has_hit = true;
-                if ((*r).tmax == (*hit).dist) {
-                    (*hit).diffuseColor = mColor[mat_index[i]].rgb + mEmission[mat_index[i]].rgb;
+                if ((*r).tmax == (*hit).dist) 
+                {
+                    (*hit).diffuseColor = triangleRGB;
                 }
             }
         }
@@ -150,16 +260,26 @@
     
     fn intersect_triangle(r: Ray, hit: ptr<function, HitInfo>, index: u32) -> bool 
     {
-        let temp = face[index]; 
-        var e0 = triangle[temp.y] - triangle[temp.x];
-        var e1 = triangle[temp.z] - triangle[temp.x];
+        let temp = faceMat[index];
+        var e0 = attribs[temp.y].triangle - attribs[temp.x].triangle;
+        var e1 = attribs[temp.z].triangle - attribs[temp.x].triangle;
         var n = cross(e0, e1);
-        var t = (dot((triangle[temp.x] - r.origin), n)) / dot(r.direction, n);
+
+        var dotMan = dot(r.direction, n);
+        if (abs(dotMan) < 1e-8) 
+        {
+            return false;
+        }
+
+        var genbrug = attribs[temp.x].triangle-r.origin;
+        var t = (dot(genbrug, n)) / dotMan;
+        var x = vec3f(0);
         
         var objectHit = false;
         if ((t < r.tmax) & (t > r.tmin)) {
-            var beta = dot(cross((triangle[temp.x]-r.origin), r.direction), e1)/dot(r.direction, n);
-            var gamma = -dot(cross((triangle[temp.x]-r.origin), r.direction), e0)/dot(r.direction, n);
+            var beta = dot(cross(genbrug, r.direction), e1)/dotMan;
+            var gamma = -dot(cross(genbrug, r.direction), e0)/dotMan;
+            var alpha = 1 - beta - gamma;
             objectHit = (beta >= 0) & (gamma >= 0) & ((beta + gamma) <= 1);
             
             if (objectHit) {
@@ -170,7 +290,8 @@
                     (*hit).dist = t;
                 }
                 (*hit).position = r.origin + t * r.direction;
-                (*hit).normal = normalize(n);
+                var x = alpha * attribs[temp.x].normal + beta * attribs[temp.y].normal + gamma * attribs[temp.z].normal;
+                (*hit).normal = normalize(x);
             }
         }
         return objectHit;
@@ -182,13 +303,13 @@
         var light = sample_point_light((*hit).position);
 
         var ray = Ray((*hit).position, -light.direction, 10, light.dist-100);
-        var temp = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0);
-
+        var temp = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0);
+        var result = (*hit).emission;
         if (intersect_scene(&ray, &temp)) { return (vec3f(0.0)); }
         else {
-            return ((*hit).diffuseColor/Pi) * (1 / (light.dist*light.dist)) * dot(-light.direction, (*hit).normal) * light.L_i;
+            result += ((*hit).diffuseColor/Pi) * (1 / (light.dist*light.dist)) * dot(-light.direction, (*hit).normal) * light.L_i;
         }
-        //return (*hit).diffuseColor;
+        return result;
     }
     
     @fragment
@@ -196,13 +317,12 @@
     {
         const bgcolor = vec4f(0.1, 0.3, 0.6, 1.0);
         const max_depth = 10;
-
         var result = vec3f(0.0);
         for (var j = 0u; j < u32(uniforms.jitterSub*uniforms.jitterSub); j++) 
         {
             let uv = vec2f(coords.x*uniforms.aspect*0.5f, coords.y*0.5f);
             var r = get_camera_ray(uv+jitter[j]);
-            var hit = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0);
+            var hit = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0);
     
             for(var i = 0; i < max_depth; i++) 
             {

@@ -15,7 +15,7 @@ async function main()
 
     const pixelSize = 1/canvas.height;
 
-    var obj_filename = '../objects/teapot.obj';
+    var obj_filename = '../objects/bunny.obj';
     var g_objDoc = null; // Info parsed from OBJ file
     var g_drawingInfo = null; // Info for drawing the 3D model with WebGL
 
@@ -64,9 +64,9 @@ async function main()
     });
 
     const aspect = canvas.width/canvas.height;
-    const camera_constant = 2.5;
+    const camera_constant = 3.5;
     const jitterSub = 1;
-    var uniforms = new Float32Array([aspect, camera_constant, jitterSub, 0  ]);
+    var uniforms = new Float32Array([aspect, camera_constant, jitterSub, 0]);
     device.queue.writeBuffer(uniformBuffer, 0, uniforms);
 
     // OBJ File has been read completely
@@ -75,24 +75,8 @@ async function main()
         // Get access to loaded data
         g_drawingInfo = g_objDoc.getDrawingInfo();
         
-
-        const vBuffer = device.createBuffer({
-            size: g_drawingInfo.vertices.byteLength,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-        });
-        device.queue.writeBuffer(vBuffer, 0, g_drawingInfo.vertices);
-        
-        const iBuffer = device.createBuffer({
-            size: g_drawingInfo.indices.byteLength,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-        });
-        device.queue.writeBuffer(iBuffer, 0, g_drawingInfo.indices);
-
-        const nBuffer = device.createBuffer({
-            size: g_drawingInfo.normals.byteLength,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-        });
-        device.queue.writeBuffer(nBuffer, 0, g_drawingInfo.normals)
+        var buffers = new Object();
+        buffers = build_bsp_tree(g_drawingInfo, device, buffers);
 
         // Create and return bind group
         const bindGroup = device.createBindGroup(
@@ -101,9 +85,13 @@ async function main()
             entries: [
                 { binding: 0, resource: { buffer: uniformBuffer } },
                 { binding: 1, resource: { buffer: jitterBuffer } },
-                { binding: 2, resource: { buffer: vBuffer } },
-                { binding: 3, resource: { buffer: iBuffer } },
-                { binding: 4, resource: { buffer: nBuffer } },
+                { binding: 2, resource: { buffer: buffers.positions } },
+                { binding: 3, resource: { buffer: buffers.indices } },
+                { binding: 4, resource: { buffer: buffers.normals } },
+                { binding: 5, resource: { buffer: buffers.aabb } },
+                { binding: 6, resource: { buffer: buffers.treeIds } },
+                { binding: 7, resource: { buffer: buffers.bspTree } },
+                { binding: 8, resource: { buffer: buffers.bspPlanes } },
             ],
         });
         return bindGroup;

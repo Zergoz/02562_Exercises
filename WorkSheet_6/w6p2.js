@@ -66,7 +66,7 @@ async function main()
     const aspect = canvas.width/canvas.height;
     const camera_constant = 1.0;
     const jitterSub = 1;
-    var uniforms = new Float32Array([aspect, camera_constant, jitterSub, 0  ]);
+    var uniforms = new Float32Array([aspect, camera_constant, jitterSub, 0]);
     device.queue.writeBuffer(uniformBuffer, 0, uniforms);
 
     // OBJ File has been read completely
@@ -75,49 +75,25 @@ async function main()
         // Get access to loaded data
         g_drawingInfo = g_objDoc.getDrawingInfo();
         
+        var buffers = new Object();
+        buffers = build_bsp_tree(g_drawingInfo, device, buffers);
 
-        const vBuffer = device.createBuffer({
-            size: g_drawingInfo.vertices.byteLength,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-        });
-        device.queue.writeBuffer(vBuffer, 0, g_drawingInfo.vertices);
+        let faceMat = new Uint32Array(g_drawingInfo.indices.length*4);
         
-        const iBuffer = device.createBuffer({
-            size: g_drawingInfo.indices.byteLength,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-        });
-        device.queue.writeBuffer(iBuffer, 0, g_drawingInfo.indices);
-        
-        const miBuffer = device.createBuffer({
-            size: g_drawingInfo.mat_indices.byteLength,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-        });
-        device.queue.writeBuffer(miBuffer, 0, g_drawingInfo.mat_indices);
-        
-        const liBuffer = device.createBuffer({
-            size: g_drawingInfo.light_indices.byteLength,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-        });
-        device.queue.writeBuffer(liBuffer, 0, g_drawingInfo.light_indices);
-
-        
-        let matColors = new Float32Array(g_drawingInfo.materials.length*4);
-        
-        for (var i = 0; i < g_drawingInfo.materials.length; i++) 
+        for (var i = 0; i < g_drawingInfo.indices.length; i++) 
         {
             var idx = i*4;
-            matColors[idx] = g_drawingInfo.materials[i].color.r;
-            matColors[idx+1] = g_drawingInfo.materials[i].color.g;
-            matColors[idx+2] = g_drawingInfo.materials[i].color.b;
-            matColors[idx+3] = g_drawingInfo.materials[i].color.a;
+            faceMat[idx] = g_drawingInfo.indices[idx];
+            faceMat[idx+1] = g_drawingInfo.indices[idx+1];
+            faceMat[idx+2] = g_drawingInfo.indices[idx+2];
+            faceMat[idx+3] = g_drawingInfo.indices[idx+3];
         }
         
-
-        const mcBuffer = device.createBuffer({
-            size: matColors.byteLength,
+        const faceMatBuffer = device.createBuffer({
+            size: faceMat.byteLength,
             usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
         });
-        device.queue.writeBuffer(mcBuffer, 0, matColors);
+        device.queue.writeBuffer(faceMatBuffer, 0, faceMat);
 
         let matEmissions = new Float32Array(g_drawingInfo.materials.length*4);
  
@@ -136,6 +112,14 @@ async function main()
         });
         device.queue.writeBuffer(meBuffer, 0, matEmissions);
 
+        const liBuffer = device.createBuffer({
+            size: g_drawingInfo.light_indices.byteLength,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+        });
+        device.queue.writeBuffer(liBuffer, 0, g_drawingInfo.light_indices);
+
+
+
         // Create and return bind group
         const bindGroup = device.createBindGroup(
         {
@@ -143,12 +127,14 @@ async function main()
             entries: [
                 { binding: 0, resource: { buffer: uniformBuffer } },
                 { binding: 1, resource: { buffer: jitterBuffer } },
-                { binding: 2, resource: { buffer: vBuffer } },
-                { binding: 3, resource: { buffer: iBuffer } },
-                { binding: 5, resource: { buffer: miBuffer } },
-                { binding: 6, resource: { buffer: mcBuffer } },
-                { binding: 7, resource: { buffer: meBuffer } },
-                { binding: 8, resource: { buffer: liBuffer } },
+                { binding: 2, resource: { buffer: buffers.attribs } },
+                { binding: 3, resource: { buffer: faceMatBuffer } },
+                { binding: 4, resource: { buffer: buffers.aabb } },
+                { binding: 5, resource: { buffer: buffers.treeIds } },
+                { binding: 6, resource: { buffer: buffers.bspTree } },
+                { binding: 7, resource: { buffer: buffers.bspPlanes } },
+                { binding: 8, resource: { buffer: meBuffer } },
+                { binding: 9, resource: { buffer: liBuffer } },
             ],
         });
         return bindGroup;
