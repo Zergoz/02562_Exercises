@@ -315,5 +315,15 @@
     <canvas id="webgpu-canvas" width="800" height="450">
         Please use a browser that supports HTML5 canvas.
     </canvas>
+    <p><b> Explanation </b></p>
+    <p> 
+        The BspTree.js file contains a constructor to make a bsp tree and subdivide its nodes. <br>
+        It is used by calling the build_bsp_tree function with a drawingInfo, a device and an empty object for storing buffers. <br>
+        First it puts all triangles of drawingInfo into a new object called "AccObj" and pushes these objects onto an array. <br>
+        It then creates a bsp tree using these objects by calling the subdivide node which calls itself recursively. <br>
+        With the bsp tree created a bsp array is constructed. This is how the information is put in the buffer. <br>
+        Finally it returns the buffers such that we can send them to the WebGPU script. <br>
+
+    </p>
 </body>
 </html>

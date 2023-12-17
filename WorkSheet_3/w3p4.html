@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+<p><b> Explanation </b></p>
+<p> 
+    When we reduce the scaling factor, the texture get magnified. The bigger the magnification the less detailed the texture becomes. <br>
+    Comparing linear vs nearest we observe that linear interpolates the different colours in the texture, such that the texture appears smoother. <br>
+    When using nearest the result is more pixilated and there is no smooth transition from one colour to another. <br>
+    <br>
+    The scaling factor amplifies the effects of the filtering methods. When using a low scaling factor the difference between nearest and linear filtering becomes obvious. <br>
+    Whereas with a high scaling factor the difference is more subtle. <br>
+    <br>
+    The pixel subdivision level together with linear filtering does not affect the texture aliasing much. <br>
+    The reason for this is that linear filtering already interpolates the colours in the texture. <br>
+    However the pixel subdivison level together with nearest filtering affects the texture aliasing quite a bit. <br>
+    When using a high pixel subdivison level with nearest filtering the colours in the texture gets more interpolated, meaning less aliasing. <br>
+    When using a low pixel subdivison level with nearest filtering there is no change compared to using just nearest filtering. <br>
+    Since the subdivision is what causes the subdivision. <br>
+    <br>
+    To get the least amount of aliasing we would use a high pixel subdivison level along with linear filtering.
+</p>
+</body>
+</html>

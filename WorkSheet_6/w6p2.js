@@ -95,22 +95,26 @@ async function main()
         });
         device.queue.writeBuffer(faceMatBuffer, 0, faceMat);
 
-        let matEmissions = new Float32Array(g_drawingInfo.materials.length*4);
+        let matEmissionColor = new Float32Array(g_drawingInfo.materials.length*8);
  
         for (var i = 0; i < g_drawingInfo.materials.length; i++) 
         {
-            var idx = i*4;
-            matEmissions[idx] = g_drawingInfo.materials[i].emission.r;
-            matEmissions[idx+1] = g_drawingInfo.materials[i].emission.g;
-            matEmissions[idx+2] = g_drawingInfo.materials[i].emission.b;
-            matEmissions[idx+3] = g_drawingInfo.materials[i].emission.a;
+            var idx = i*8;
+            matEmissionColor[idx] = g_drawingInfo.materials[i].emission.r;
+            matEmissionColor[idx+1] = g_drawingInfo.materials[i].emission.g;
+            matEmissionColor[idx+2] = g_drawingInfo.materials[i].emission.b;
+            matEmissionColor[idx+3] = g_drawingInfo.materials[i].emission.a;
+            matEmissionColor[idx+4] = g_drawingInfo.materials[i].color.r;
+            matEmissionColor[idx+5] = g_drawingInfo.materials[i].color.g;
+            matEmissionColor[idx+6] = g_drawingInfo.materials[i].color.b;
+            matEmissionColor[idx+7] = g_drawingInfo.materials[i].color.a;
         }
 
-        const meBuffer = device.createBuffer({
-            size: matEmissions.byteLength,
+        const mecBuffer = device.createBuffer({
+            size: matEmissionColor.byteLength,
             usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
         });
-        device.queue.writeBuffer(meBuffer, 0, matEmissions);
+        device.queue.writeBuffer(mecBuffer, 0, matEmissionColor);
 
         const liBuffer = device.createBuffer({
             size: g_drawingInfo.light_indices.byteLength,
@@ -133,7 +137,7 @@ async function main()
                 { binding: 5, resource: { buffer: buffers.treeIds } },
                 { binding: 6, resource: { buffer: buffers.bspTree } },
                 { binding: 7, resource: { buffer: buffers.bspPlanes } },
-                { binding: 8, resource: { buffer: meBuffer } },
+                { binding: 8, resource: { buffer: mecBuffer } },
                 { binding: 9, resource: { buffer: liBuffer } },
             ],
         });
