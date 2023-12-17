@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+img {
+  width: 100%;
+}
+</style>
+</head>
+<body>
+
+<img src="w10p3.png" alt="Glass cube, metallic christmas sphere, big elephant with realistic material shader" style="width:960px;height:540px;">
+<p><b> Explanation </b></p>
+<p> 
+    <b> Cube: </b> <br>
+    The cube is made to immitate a glass surface. This is done by setting its roughness to 0, since glass' surface is smooth. <br>
+    Metallic is set to 0. The higher the metallic attribute is, the more it will mirror its surroundings. At a value of 1, it will be a mirror cube. <br>
+    To make it refract light like a glass cube, the transmission weight is set to 1. <br>
+    <br>
+    <b> Sphere: </b> <br>
+    The sphere is given a metallic surface to mimic the mirror effect of a christmas ornament. <br>
+    The roughness is slightly increased, to blur the mirror effect. <br>
+    The specular IOR level is maxed out to give specular hightlights, which is fitting for an ornament. <br>
+    <br>
+    <b> Elephant: </b> <br>
+    The elephant has 3 different materials, assigned by its .obj file. <br>
+    <b> Eyes: </b> <br>
+    The eye material has a black base colour, roughness 0.15 and a specular IOR level of 0.98. <br>
+    The roughness is low to simulate the smooth and slightly wet surface of an eyeball. The IOR level is high to include specular highlights. <br>
+    This makes the eyes reflect light in a way that seems realistic. <br>
+    <b> Tusks: </b> <br>
+    The tusk material has a whitish base colour, roughness 0.553 and a specular IOR level of 0.08. <br>
+    Since ivory is pretty smooth but still has some structure the roughness is set to a medium value. <br>
+    The specular IOR level is low since tusks wouldnt have obvious specular highlights. <br>
+    <b> Skin: </b> <br>
+    The skin material has a dark gray base colour, roughness 1.0 and a specular IOR level of 0.0. <br>
+    Skin in general is anything but a smooth surface, especially for animals in hot environments. For this reason the roughness is set to max. <br>
+    Skin doesnt have specular highlights either, so this value is set to min. <br>
+    <br>
+    <b> Render parameters: </b> <br>
+    There are 3 values worth mentioning. <br>
+    <b> Viewport: </b> <br>
+    We set the min samples to 0 since Cycles then automatically, using the noise threshold, finds the value itself. <br>
+    We set the max samples to 32, to limit the time it takes to render the scene.
+    <b> Render: </b> <br>
+    We have set the max samples to 128, as we found this to be a good middle ground between render time and accuracy of the scene. <br>
+    Again the min samples are set to 0 to utilize the noise threshold. <br>
+    <b> Max bounces: </b> <br>
+    We kept the default values of 12 total bounces, 4 for diffuse and glossy surfaces and 12 for transmissive surfaces. <br>
+    We tested some values and found that it didnt make much difference for either the run time or the rendered scene. <br>
+    
+
+</p>
+</body>
+</html>
