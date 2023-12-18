@@ -76,8 +76,8 @@
         {
             return false;
         }
-        (*r).tmin = max(tmin - 1.0e-4f, (*r).tmin);
-        (*r).tmax = min(tmax + 1.0e-4f, (*r).tmax);
+        (*r).tmin = max(tmin - 1.0e-2f, (*r).tmin);
+        (*r).tmax = min(tmax + 1.0e-2f, (*r).tmax);
         return true;
     }
 
