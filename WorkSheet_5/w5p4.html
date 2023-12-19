@@ -155,7 +155,6 @@
             }
         }
         return objectHit;
-        
     }
 
     fn shade(r: ptr<function, Ray>, hit: ptr<function, HitInfo>) -> vec3f
@@ -165,7 +164,6 @@
         var ray = Ray((*hit).position, -light.direction, 0.0, light.dist);
         var temp = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0);
 
-        //return ((*hit).diffuseColor/Pi) * 1 * light.L_i * dot(-light.direction, (*hit).normal);
         return (*hit).diffuseColor;
     }
     

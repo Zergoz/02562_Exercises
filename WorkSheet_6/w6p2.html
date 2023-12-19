@@ -50,7 +50,7 @@
     
     const Pi = 3.1415926535; // Pi, but not
     const lightPosition = vec3f(0.0, 1.0, 0.0);
-    const epsilon = 0.0001;
+    const epsilon = 0.01;
     const MAX_LEVEL = 20u;
     const BSP_LEAF = 3u;
     var<private> branch_node: array<vec2u, MAX_LEVEL>;
@@ -76,8 +76,8 @@
         {
             return false;
         }
-        (*r).tmin = max(tmin - 1.0e-2f, (*r).tmin);
-        (*r).tmax = min(tmax + 1.0e-2f, (*r).tmax);
+        (*r).tmin = max(tmin - epsilon, (*r).tmin);
+        (*r).tmax = min(tmax + epsilon, (*r).tmax);
         return true;
     }
 
@@ -302,7 +302,7 @@
     {       
         var light = sample_point_light((*hit).position);
 
-        var ray = Ray((*hit).position, -light.direction, 10, light.dist-100);
+        var ray = Ray((*hit).position, -light.direction, epsilon, light.dist-epsilon);
         var temp = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0, 0);
         var result = (*hit).emission;
         if (intersect_trimesh(&ray, &temp)) { return (vec3f(0.0)); }

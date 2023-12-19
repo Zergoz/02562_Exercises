@@ -65,7 +65,7 @@ async function main()
 
     const aspect = canvas.width/canvas.height;
     const camera_constant = 3.5;
-    const jitterSub = 1;
+    const jitterSub = 3;
     var uniforms = new Float32Array([aspect, camera_constant, jitterSub, 0]);
     device.queue.writeBuffer(uniformBuffer, 0, uniforms);
 
@@ -143,7 +143,7 @@ async function main()
     }
     
     function render() {
-        compute_jitters(jitter, pixelSize, uniforms[4]);
+        compute_jitters(jitter, pixelSize, uniforms[2]);
         device.queue.writeBuffer(jitterBuffer, 0, jitter);
     
         device.queue.writeBuffer(uniformBuffer, 0, uniforms);

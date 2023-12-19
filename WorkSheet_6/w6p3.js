@@ -15,7 +15,7 @@ async function main()
 
     const pixelSize = 1/canvas.height;
 
-    var obj_filename = '../objects/CornellBoxWithBlocks.obj';
+    var obj_filename = '../objects/CornellBox.obj';
     var g_objDoc = null; // Info parsed from OBJ file
     var g_drawingInfo = null; // Info for drawing the 3D model with WebGL
 
@@ -75,66 +75,54 @@ async function main()
         // Get access to loaded data
         g_drawingInfo = g_objDoc.getDrawingInfo();
         
+        var buffers = new Object();
+        buffers = build_bsp_tree(g_drawingInfo, device, buffers);
 
-        const vBuffer = device.createBuffer({
-            size: g_drawingInfo.vertices.byteLength,
+        let faceMat = new Uint32Array(g_drawingInfo.indices.length*4);
+        
+        for (var i = 0; i < g_drawingInfo.indices.length; i++) 
+        {
+            var idx = i*4;
+            faceMat[idx] = g_drawingInfo.indices[idx];
+            faceMat[idx+1] = g_drawingInfo.indices[idx+1];
+            faceMat[idx+2] = g_drawingInfo.indices[idx+2];
+            faceMat[idx+3] = g_drawingInfo.indices[idx+3];
+        }
+        
+        const faceMatBuffer = device.createBuffer({
+            size: faceMat.byteLength,
             usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
         });
-        device.queue.writeBuffer(vBuffer, 0, g_drawingInfo.vertices);
-        
-        const iBuffer = device.createBuffer({
-            size: g_drawingInfo.indices.byteLength,
+        device.queue.writeBuffer(faceMatBuffer, 0, faceMat);
+
+        let matEmissionColor = new Float32Array(g_drawingInfo.materials.length*8);
+ 
+        for (var i = 0; i < g_drawingInfo.materials.length; i++) 
+        {
+            var idx = i*8;
+            matEmissionColor[idx] = g_drawingInfo.materials[i].emission.r;
+            matEmissionColor[idx+1] = g_drawingInfo.materials[i].emission.g;
+            matEmissionColor[idx+2] = g_drawingInfo.materials[i].emission.b;
+            matEmissionColor[idx+3] = g_drawingInfo.materials[i].emission.a;
+            matEmissionColor[idx+4] = g_drawingInfo.materials[i].color.r;
+            matEmissionColor[idx+5] = g_drawingInfo.materials[i].color.g;
+            matEmissionColor[idx+6] = g_drawingInfo.materials[i].color.b;
+            matEmissionColor[idx+7] = g_drawingInfo.materials[i].color.a;
+        }
+
+        const mecBuffer = device.createBuffer({
+            size: matEmissionColor.byteLength,
             usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
         });
-        device.queue.writeBuffer(iBuffer, 0, g_drawingInfo.indices);
-        
-        const miBuffer = device.createBuffer({
-            size: g_drawingInfo.mat_indices.byteLength,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-        });
-        device.queue.writeBuffer(miBuffer, 0, g_drawingInfo.mat_indices);
-        
+        device.queue.writeBuffer(mecBuffer, 0, matEmissionColor);
+
         const liBuffer = device.createBuffer({
             size: g_drawingInfo.light_indices.byteLength,
             usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
         });
         device.queue.writeBuffer(liBuffer, 0, g_drawingInfo.light_indices);
 
-        
-        let matColors = new Float32Array(g_drawingInfo.materials.length*4);
-        
-        for (var i = 0; i < g_drawingInfo.materials.length; i++) 
-        {
-            var idx = i*4;
-            matColors[idx] = g_drawingInfo.materials[i].color.r;
-            matColors[idx+1] = g_drawingInfo.materials[i].color.g;
-            matColors[idx+2] = g_drawingInfo.materials[i].color.b;
-            matColors[idx+3] = g_drawingInfo.materials[i].color.a;
-        }
-        
 
-        const mcBuffer = device.createBuffer({
-            size: matColors.byteLength,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-        });
-        device.queue.writeBuffer(mcBuffer, 0, matColors);
-
-        let matEmissions = new Float32Array(g_drawingInfo.materials.length*4);
- 
-        for (var i = 0; i < g_drawingInfo.materials.length; i++) 
-        {
-            var idx = i*4;
-            matEmissions[idx] = g_drawingInfo.materials[i].emission.r;
-            matEmissions[idx+1] = g_drawingInfo.materials[i].emission.g;
-            matEmissions[idx+2] = g_drawingInfo.materials[i].emission.b;
-            matEmissions[idx+3] = g_drawingInfo.materials[i].emission.a;
-        }
-
-        const meBuffer = device.createBuffer({
-            size: matEmissions.byteLength,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-        });
-        device.queue.writeBuffer(meBuffer, 0, matEmissions);
 
         // Create and return bind group
         const bindGroup = device.createBindGroup(
@@ -143,12 +131,14 @@ async function main()
             entries: [
                 { binding: 0, resource: { buffer: uniformBuffer } },
                 { binding: 1, resource: { buffer: jitterBuffer } },
-                { binding: 2, resource: { buffer: vBuffer } },
-                { binding: 3, resource: { buffer: iBuffer } },
-                { binding: 5, resource: { buffer: miBuffer } },
-                { binding: 6, resource: { buffer: mcBuffer } },
-                { binding: 7, resource: { buffer: meBuffer } },
-                { binding: 8, resource: { buffer: liBuffer } },
+                { binding: 2, resource: { buffer: buffers.attribs } },
+                { binding: 3, resource: { buffer: faceMatBuffer } },
+                { binding: 4, resource: { buffer: buffers.aabb } },
+                { binding: 5, resource: { buffer: buffers.treeIds } },
+                { binding: 6, resource: { buffer: buffers.bspTree } },
+                { binding: 7, resource: { buffer: buffers.bspPlanes } },
+                { binding: 8, resource: { buffer: mecBuffer } },
+                { binding: 9, resource: { buffer: liBuffer } },
             ],
         });
         return bindGroup;

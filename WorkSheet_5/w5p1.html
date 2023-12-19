@@ -161,10 +161,6 @@
                 (*hit).use_texture = false;
             }
         }
-
-        // For each intersection found, update (*r).tmax and store additional info about the hit.
-
-
         return (*hit).has_hit;
     }
 
@@ -214,7 +210,6 @@
             (*hit).normal = n;
         }
         return objectHit;
-        
     }
 
     fn intersect_sphere(r: Ray, hit: ptr<function, HitInfo>, center: vec3f, radius: f32) -> bool 
@@ -326,41 +321,6 @@
             case default { return (*hit).ambientColor + (*hit).diffuseColor; }
         }
     }
-    /*
-    @fragment
-    fn main_fs(@location(0) coords: vec2f) -> @location(0) vec4f
-    {
-        const bgcolor = vec4f(0.1, 0.3, 0.6, 1.0);
-        const max_depth = 10;
-        let uv = vec2f(coords.x*uniforms.aspect*0.5f, coords.y*0.5f);
-        var r = get_camera_ray(uv);
-        let temp = jitter[0];
-        let temp2 = uniforms.jitterSub;
-        var result = vec3f(0.0);
-        var textured = vec3f(0.0);
-        var hit = HitInfo(false, 0.0, vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), 0, 0, 0, 0, vec2f(0.0), false);
-
-        for(var i = 0; i < max_depth; i++) 
-        {
-            if(intersect_scene(&r, &hit)) { 
-                if (hit.use_texture) { textured += shade(&r, &hit); }
-                else { result += shade(&r, &hit); }
-            }
-            else { 
-                if (hit.use_texture) { textured += bgcolor.rgb; }
-                else { result += bgcolor.rgb; }
-                break; 
-            }
-
-            if(hit.has_hit) { break; }
-        }
-        
-        let texColor = textureSample(my_texture, my_sampler, hit.texcoords).rgb;
-        result += textured*texColor;
-
-        return vec4f(pow(result, vec3f(0.66)), bgcolor.a);
-    }
-    */
     
     @fragment
     fn main_fs(@location(0) coords: vec2f) -> @location(0) vec4f
